@@ -191,8 +191,14 @@
     </div>
     <hr class="divider">
     <div class="grid">
-      <div class="field span2"><label>URL imagem frente</label><input type="text" id="f_frente" placeholder="https://drive.google.com/..."></div>
-      <div class="field span2"><label>URL imagem verso</label><input type="text" id="f_verso" placeholder="https://drive.google.com/..."></div>
+      <div class="field span2">
+        <label>Imagem frente (arquivo)</label>
+        <input type="file" id="f_frente" accept="image/*">
+      </div>
+      <div class="field span2">
+        <label>Imagem verso (arquivo)</label>
+        <input type="file" id="f_verso" accept="image/*">
+      </div>
     </div>
     <div class="field" style="margin-top:12px;">
       <label>Outras imagens (URLs separadas por vírgula)</label>
@@ -256,37 +262,44 @@ $('submitBtn').addEventListener('click', async ()=>{
   }
   const sku = $('f_sku').value.trim();
   const nome = $('f_nome').value.trim();
+  const frenteFile = $('f_frente').files[0];
+  const versoFile = $('f_verso').files[0];
   if(!sku || !nome){
     statusEl.textContent = 'Preenche pelo menos SKU e Nome do produto.';
     statusEl.className = 'status-line err';
     return;
   }
+  if(!frenteFile || !versoFile){
+    statusEl.textContent = 'Seleciona as duas fotos (frente e verso) antes de enviar.';
+    statusEl.className = 'status-line err';
+    return;
+  }
 
-  const payload = {
-    "SKU": sku,
-    "Nome Produto": nome,
-    "Marca": $('f_marca').value.trim(),
-    "Modelo": $('f_modelo').value.trim(),
-    "Cor": $('f_cor').value.trim(),
-    "Gênero": $('f_genero').value.trim(),
-    "EAN": $('f_ean').value.trim(),
-    "Custo": parseMoney($('f_custo').value),
-    "Preço Venda": parseMoney($('f_preco').value),
-    "Tem Variação?": $('f_variacao').value,
-    "url_frente_direta": $('f_frente').value.trim(),
-    "url_verso_direta": $('f_verso').value.trim(),
-    "Imagens_URL_Produto": $('f_outras').value.trim()
-  };
+  const fd = new FormData();
+  fd.append('SKU', sku);
+  fd.append('Nome Produto', nome);
+  fd.append('Marca', $('f_marca').value.trim());
+  fd.append('Modelo', $('f_modelo').value.trim());
+  fd.append('Cor', $('f_cor').value.trim());
+  fd.append('Gênero', $('f_genero').value.trim());
+  fd.append('EAN', $('f_ean').value.trim());
+  fd.append('Custo', parseMoney($('f_custo').value) ?? '');
+  fd.append('Preço Venda', parseMoney($('f_preco').value) ?? '');
+  fd.append('Tem Variação?', $('f_variacao').value);
+  fd.append('Imagens_URL_Produto', $('f_outras').value.trim());
+  fd.append('frente', frenteFile, frenteFile.name);
+  fd.append('verso', versoFile, versoFile.name);
 
   $('submitBtn').disabled = true;
   $('submitBtn').textContent = 'Enviando...';
   statusEl.textContent = '';
 
   try{
+    // Não define Content-Type manualmente: o navegador monta o boundary
+    // correto do multipart/form-data sozinho quando o body é um FormData.
     const res = await fetch(settings.triggerUrl, {
       method:'POST',
-      headers:{'Content-Type':'application/json'},
-      body: JSON.stringify(payload)
+      body: fd
     });
     if(!res.ok){
       throw new Error('O n8n respondeu com erro ' + res.status);
@@ -306,8 +319,10 @@ $('submitBtn').addEventListener('click', async ()=>{
 });
 
 function clearForm(){
-  ['f_sku','f_nome','f_marca','f_modelo','f_cor','f_genero','f_ean','f_custo','f_preco','f_frente','f_verso','f_outras']
+  ['f_sku','f_nome','f_marca','f_modelo','f_cor','f_genero','f_ean','f_custo','f_preco','f_outras']
     .forEach(id => $(id).value = '');
+  $('f_frente').value = '';
+  $('f_verso').value = '';
   $('f_variacao').value = 'Não';
 }
 
