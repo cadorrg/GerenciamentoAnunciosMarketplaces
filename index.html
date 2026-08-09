@@ -373,7 +373,7 @@ function cssEscape(s){ return (window.CSS && CSS.escape) ? CSS.escape(s) : s.rep
 
 function badgeClass(status){
   const s = (status||'').toLowerCase();
-  if(s.includes('conclu')) return 'concluido';
+  if(s.includes('conclu') || s.includes('public')) return 'concluido';
   if(s.includes('erro') || s.includes('fal')) return 'erro';
   if(s.includes('aguard') || s.includes('pend')) return 'aguardando';
   return 'processando';
@@ -387,7 +387,14 @@ function itemHtml(item){
   const bLabel = escapeHtml(item.status_label || item.etapa || item.status || 'processando');
 
   let approvalHtml = '';
-  if(item.imagem_url && item.resume_url){
+  if(item.status && item.status.toLowerCase().includes('erro')){
+    approvalHtml = `
+      <div class="approval" style="border-top:1px solid var(--line);padding-top:10px;margin-top:10px;">
+        <div class="txt">
+          <p style="color:#a52f40;">${escapeHtml(item.mensagem_erro || 'Algo deu errado nessa etapa. Confere a execução no n8n para mais detalhes.')}</p>
+        </div>
+      </div>`;
+  } else if(item.imagem_url && item.resume_url){
     const busy = busyResumeUrls.has(item.resume_url);
     approvalHtml = `
       <div class="approval">
