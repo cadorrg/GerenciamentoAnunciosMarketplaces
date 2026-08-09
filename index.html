@@ -170,34 +170,7 @@
       <h1>Central de Anúncios</h1>
       <p class="sub">Cria e acompanha anúncios do Mercado Livre sem abrir o n8n.</p>
     </div>
-    <button class="icon-btn" id="settingsToggle" title="Configurar webhooks" aria-label="Configurar webhooks">⚙</button>
   </header>
-
-  <section class="settings" id="settingsPanel">
-    <h2>Webhooks do n8n</h2>
-    <div class="field">
-      <label for="triggerUrl">URL do webhook de disparo (POST)</label>
-      <input type="text" id="triggerUrl" placeholder="https://seu-n8n.com/webhook/criar-anuncio">
-    </div>
-    <div class="field">
-      <label for="statusUrl">URL do webhook de status (GET)</label>
-      <input type="text" id="statusUrl" placeholder="https://seu-n8n.com/webhook/status-anuncios">
-    </div>
-    <div class="field">
-      <label for="pollInterval">Atualizar status a cada</label>
-      <select id="pollInterval">
-        <option value="5000">5 segundos</option>
-        <option value="10000" selected>10 segundos</option>
-        <option value="30000">30 segundos</option>
-        <option value="0">Manual (sem atualizar sozinho)</option>
-      </select>
-    </div>
-    <div class="settings-actions">
-      <button class="ghost" id="cancelSettings">Cancelar</button>
-      <button class="primary" id="saveSettings">Salvar</button>
-    </div>
-    <div class="status-line" id="settingsStatus"></div>
-  </section>
 
   <div class="card">
     <h2>Novo anúncio</h2>
@@ -242,34 +215,20 @@
 <div class="toast" id="toast"></div>
 
 <script>
+// ======================================================
+// COLE SUAS URLS DO N8N AQUI (é só isso que precisa editar)
+// ======================================================
+const CONFIG = {
+  triggerUrl: 'https://n8n.coolify.cadoshop.com.br/webhook/criar_anuncio',
+  statusUrl: 'https://n8n.coolify.cadoshop.com.br/webhook/status-anuncios',
+  pollInterval: 10000 // em milissegundos. Use 0 para não atualizar sozinho.
+};
+// ======================================================
+
 const $ = id => document.getElementById(id);
-let settings = { triggerUrl:'', statusUrl:'', pollInterval:10000 };
+let settings = { ...CONFIG };
 let pollTimer = null;
 let busyResumeUrls = new Set();
-
-// ---------- storage ----------
-async function loadSettings(){
-  try{
-    const res = await window.storage.get('settings', false);
-    if(res && res.value){
-      settings = { ...settings, ...JSON.parse(res.value) };
-    }
-  }catch(e){ /* no settings saved yet */ }
-  $('triggerUrl').value = settings.triggerUrl || '';
-  $('statusUrl').value = settings.statusUrl || '';
-  $('pollInterval').value = String(settings.pollInterval ?? 10000);
-  if(!settings.triggerUrl || !settings.statusUrl){
-    $('settingsPanel').classList.add('open');
-  }
-}
-
-async function saveSettingsToStorage(){
-  try{
-    await window.storage.set('settings', JSON.stringify(settings), false);
-  }catch(e){
-    showToast('Não consegui salvar as configurações. Tenta de novo.');
-  }
-}
 
 // ---------- toast ----------
 let toastTimer;
@@ -281,27 +240,6 @@ function showToast(msg){
   toastTimer = setTimeout(()=> t.classList.remove('show'), 3200);
 }
 
-// ---------- settings panel ----------
-$('settingsToggle').addEventListener('click', ()=>{
-  $('settingsPanel').classList.toggle('open');
-});
-$('cancelSettings').addEventListener('click', ()=>{
-  $('triggerUrl').value = settings.triggerUrl || '';
-  $('statusUrl').value = settings.statusUrl || '';
-  $('settingsPanel').classList.remove('open');
-});
-$('saveSettings').addEventListener('click', async ()=>{
-  settings.triggerUrl = $('triggerUrl').value.trim();
-  settings.statusUrl = $('statusUrl').value.trim();
-  settings.pollInterval = Number($('pollInterval').value);
-  await saveSettingsToStorage();
-  $('settingsStatus').textContent = 'Configurações salvas.';
-  $('settingsStatus').className = 'status-line ok';
-  setTimeout(()=>{ $('settingsStatus').textContent=''; }, 2500);
-  restartPolling();
-  fetchStatus();
-});
-
 // ---------- create ad ----------
 function parseMoney(v){
   if(!v) return null;
@@ -312,7 +250,7 @@ function parseMoney(v){
 $('submitBtn').addEventListener('click', async ()=>{
   const statusEl = $('createStatus');
   if(!settings.triggerUrl){
-    statusEl.textContent = 'Configura a URL do webhook de disparo primeiro (ícone de engrenagem).';
+    statusEl.textContent = 'Falta configurar CONFIG.triggerUrl no código do arquivo.';
     statusEl.className = 'status-line err';
     return;
   }
@@ -377,7 +315,7 @@ function clearForm(){
 async function fetchStatus(){
   const listEl = $('list');
   if(!settings.statusUrl){
-    listEl.innerHTML = `<div class="empty"><strong>Configura o webhook de status</strong>Sem essa URL não dá pra acompanhar o andamento por aqui — clica na engrenagem no topo.</div>`;
+    listEl.innerHTML = `<div class="empty"><strong>Configura o webhook de status</strong>Sem essa URL não dá pra acompanhar o andamento por aqui — edita CONFIG.statusUrl no código do arquivo.</div>`;
     $('itemCount').textContent = '';
     return;
   }
@@ -502,7 +440,6 @@ function restartPolling(){
 
 // ---------- init ----------
 (async function init(){
-  await loadSettings();
   await fetchStatus();
   restartPolling();
 })();
