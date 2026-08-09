@@ -201,8 +201,8 @@
       </div>
     </div>
     <div class="field" style="margin-top:12px;">
-      <label>Outras imagens (URLs separadas por vírgula)</label>
-      <input type="text" id="f_outras" placeholder="https://..., https://...">
+      <label>Foto do produto (visão geral, arquivo)</label>
+      <input type="file" id="f_produto" accept="image/*">
     </div>
     <div class="form-actions">
       <button class="primary" id="submitBtn">Criar anúncio</button>
@@ -264,13 +264,14 @@ $('submitBtn').addEventListener('click', async ()=>{
   const nome = $('f_nome').value.trim();
   const frenteFile = $('f_frente').files[0];
   const versoFile = $('f_verso').files[0];
+  const produtoFile = $('f_produto').files[0];
   if(!sku || !nome){
     statusEl.textContent = 'Preenche pelo menos SKU e Nome do produto.';
     statusEl.className = 'status-line err';
     return;
   }
-  if(!frenteFile || !versoFile){
-    statusEl.textContent = 'Seleciona as duas fotos (frente e verso) antes de enviar.';
+  if(!frenteFile || !versoFile || !produtoFile){
+    statusEl.textContent = 'Seleciona as três fotos (frente, verso e produto) antes de enviar.';
     statusEl.className = 'status-line err';
     return;
   }
@@ -286,9 +287,9 @@ $('submitBtn').addEventListener('click', async ()=>{
   fd.append('Custo', parseMoney($('f_custo').value) ?? '');
   fd.append('Preço Venda', parseMoney($('f_preco').value) ?? '');
   fd.append('Tem Variação?', $('f_variacao').value);
-  fd.append('Imagens_URL_Produto', $('f_outras').value.trim());
   fd.append('frente', frenteFile, frenteFile.name);
   fd.append('verso', versoFile, versoFile.name);
+  fd.append('produto', produtoFile, produtoFile.name);
 
   $('submitBtn').disabled = true;
   $('submitBtn').textContent = 'Enviando...';
@@ -319,10 +320,11 @@ $('submitBtn').addEventListener('click', async ()=>{
 });
 
 function clearForm(){
-  ['f_sku','f_nome','f_marca','f_modelo','f_cor','f_genero','f_ean','f_custo','f_preco','f_outras']
+  ['f_sku','f_nome','f_marca','f_modelo','f_cor','f_genero','f_ean','f_custo','f_preco']
     .forEach(id => $(id).value = '');
   $('f_frente').value = '';
   $('f_verso').value = '';
+  $('f_produto').value = '';
   $('f_variacao').value = 'Não';
 }
 
