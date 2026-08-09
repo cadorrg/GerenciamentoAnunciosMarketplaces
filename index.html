@@ -1,0 +1,511 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Central de Anúncios</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@500;600;700&family=Inter:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500&display=swap" rel="stylesheet">
+<style>
+  :root{
+    --ink:#1a1d29;
+    --ink-soft:#565b6b;
+    --paper:#f4f5f8;
+    --surface:#ffffff;
+    --line:#e2e4ea;
+    --amber:#e2962f;
+    --amber-soft:#fbecd6;
+    --green:#2f9e63;
+    --green-soft:#e3f5eb;
+    --red:#d6455a;
+    --red-soft:#fbe6e9;
+    --blue:#3a6fd8;
+    --blue-soft:#e7edfc;
+    --radius:10px;
+  }
+  *{box-sizing:border-box;}
+  body{
+    margin:0;
+    background:var(--paper);
+    color:var(--ink);
+    font-family:'Inter',sans-serif;
+    -webkit-font-smoothing:antialiased;
+  }
+  .wrap{max-width:820px;margin:0 auto;padding:32px 20px 80px;}
+
+  header.top{
+    display:flex;justify-content:space-between;align-items:flex-start;
+    margin-bottom:28px;gap:16px;
+  }
+  h1{
+    font-family:'Space Grotesk',sans-serif;
+    font-size:26px;font-weight:700;margin:0 0 4px;letter-spacing:-0.01em;
+  }
+  .sub{color:var(--ink-soft);font-size:14px;margin:0;}
+  button.icon-btn{
+    background:var(--surface);border:1px solid var(--line);border-radius:8px;
+    width:38px;height:38px;display:flex;align-items:center;justify-content:center;
+    cursor:pointer;color:var(--ink-soft);flex-shrink:0;
+  }
+  button.icon-btn:hover{border-color:var(--ink-soft);color:var(--ink);}
+
+  /* settings */
+  .settings{
+    background:var(--surface);border:1px solid var(--line);border-radius:var(--radius);
+    padding:18px 20px;margin-bottom:24px;display:none;
+  }
+  .settings.open{display:block;}
+  .settings h2{font-size:13px;text-transform:uppercase;letter-spacing:.06em;color:var(--ink-soft);margin:0 0 14px;font-weight:600;}
+  .field{margin-bottom:12px;}
+  .field label{display:block;font-size:12.5px;color:var(--ink-soft);margin-bottom:4px;}
+  .field input, .field select{
+    width:100%;padding:9px 11px;border:1px solid var(--line);border-radius:7px;
+    font-size:14px;font-family:'Inter',sans-serif;background:var(--paper);color:var(--ink);
+  }
+  .field input:focus, .field select:focus{outline:2px solid var(--blue);outline-offset:1px;border-color:var(--blue);}
+  .settings-actions{display:flex;justify-content:flex-end;gap:8px;margin-top:6px;}
+
+  button.primary{
+    background:var(--ink);color:#fff;border:none;border-radius:7px;
+    padding:9px 16px;font-size:14px;font-weight:600;cursor:pointer;font-family:inherit;
+  }
+  button.primary:hover{background:#333748;}
+  button.primary:disabled{background:#a7abb8;cursor:default;}
+  button.ghost{
+    background:transparent;border:1px solid var(--line);color:var(--ink-soft);
+    border-radius:7px;padding:9px 16px;font-size:14px;font-weight:500;cursor:pointer;font-family:inherit;
+  }
+  button.ghost:hover{border-color:var(--ink-soft);color:var(--ink);}
+
+  .status-line{font-size:12.5px;margin-top:8px;}
+  .status-line.ok{color:var(--green);}
+  .status-line.err{color:var(--red);}
+
+  /* create form */
+  .card{
+    background:var(--surface);border:1px solid var(--line);border-radius:var(--radius);
+    padding:20px 22px;margin-bottom:16px;
+  }
+  .card h2{font-family:'Space Grotesk',sans-serif;font-size:16px;margin:0 0 16px;font-weight:600;}
+  .grid{display:grid;grid-template-columns:repeat(auto-fit, minmax(160px,1fr));gap:12px 14px;}
+  .grid .span2{grid-column:span 2;}
+  .divider{border:none;border-top:1px solid var(--line);margin:16px 0;}
+  .form-actions{display:flex;justify-content:flex-end;margin-top:16px;}
+
+  /* list */
+  .list-head{display:flex;justify-content:space-between;align-items:center;margin:32px 0 12px;}
+  .list-head h2{font-family:'Space Grotesk',sans-serif;font-size:16px;margin:0;font-weight:600;}
+  .list-head .count{font-size:12.5px;color:var(--ink-soft);}
+
+  .empty{
+    background:var(--surface);border:1px dashed var(--line);border-radius:var(--radius);
+    padding:36px 20px;text-align:center;color:var(--ink-soft);font-size:14px;
+  }
+  .empty strong{display:block;color:var(--ink);font-size:15px;margin-bottom:4px;font-weight:600;}
+
+  .item{
+    background:var(--surface);border:1px solid var(--line);border-radius:var(--radius);
+    margin-bottom:10px;overflow:hidden;display:flex;
+  }
+  .tag{
+    width:34px;flex-shrink:0;background:repeating-linear-gradient(
+      to bottom, transparent 0 6px, var(--line) 6px 7px
+    );border-right:1px dashed var(--line);display:flex;align-items:center;justify-content:center;
+  }
+  .tag span{
+    writing-mode:vertical-rl;transform:rotate(180deg);
+    font-family:'IBM Plex Mono',monospace;font-size:11px;letter-spacing:.05em;color:var(--ink-soft);
+  }
+  .item-body{flex:1;padding:14px 16px;min-width:0;}
+  .item-top{display:flex;justify-content:space-between;align-items:flex-start;gap:10px;}
+  .item-name{font-weight:600;font-size:14.5px;margin:0;}
+  .item-sku{font-family:'IBM Plex Mono',monospace;font-size:12px;color:var(--ink-soft);margin:2px 0 0;}
+  .badge{
+    font-size:11.5px;font-weight:600;padding:4px 10px;border-radius:20px;white-space:nowrap;
+    flex-shrink:0;
+  }
+  .badge.aguardando{background:var(--amber-soft);color:#96650f;}
+  .badge.processando{background:var(--blue-soft);color:#2551a8;}
+  .badge.concluido{background:var(--green-soft);color:#1c7847;}
+  .badge.erro{background:var(--red-soft);color:#a52f40;}
+
+  .approval{
+    margin-top:12px;padding-top:12px;border-top:1px solid var(--line);
+    display:flex;gap:12px;align-items:flex-start;
+  }
+  .approval img{width:80px;height:80px;object-fit:cover;border-radius:7px;background:var(--paper);flex-shrink:0;}
+  .approval .txt{flex:1;min-width:0;}
+  .approval .txt p{margin:0 0 8px;font-size:13px;color:var(--ink-soft);}
+  .approval .actions{display:flex;gap:8px;}
+  button.approve, button.reject{
+    border-radius:7px;padding:7px 13px;font-size:13px;font-weight:600;cursor:pointer;
+    display:flex;align-items:center;gap:5px;font-family:inherit;border:1px solid transparent;
+  }
+  button.approve{background:var(--green-soft);color:#1c7847;border-color:#bfe6d2;}
+  button.approve:hover{background:#d3f0e1;}
+  button.reject{background:var(--red-soft);color:#a52f40;border-color:#f3c3cb;}
+  button.reject:hover{background:#f8d4da;}
+  button.approve:disabled, button.reject:disabled{opacity:.5;cursor:default;}
+
+  .link-out{font-size:12.5px;color:var(--blue);text-decoration:none;font-weight:500;}
+  .link-out:hover{text-decoration:underline;}
+
+  .toast{
+    position:fixed;bottom:20px;left:50%;transform:translateX(-50%);
+    background:var(--ink);color:#fff;padding:10px 18px;border-radius:8px;font-size:13.5px;
+    opacity:0;pointer-events:none;transition:opacity .2s ease, transform .2s ease;
+  }
+  .toast.show{opacity:1;transform:translateX(-50%) translateY(-4px);}
+
+  @media (prefers-reduced-motion: reduce){
+    .toast{transition:none;}
+  }
+</style>
+</head>
+<body>
+<div class="wrap">
+
+  <header class="top">
+    <div>
+      <h1>Central de Anúncios</h1>
+      <p class="sub">Cria e acompanha anúncios do Mercado Livre sem abrir o n8n.</p>
+    </div>
+    <button class="icon-btn" id="settingsToggle" title="Configurar webhooks" aria-label="Configurar webhooks">⚙</button>
+  </header>
+
+  <section class="settings" id="settingsPanel">
+    <h2>Webhooks do n8n</h2>
+    <div class="field">
+      <label for="triggerUrl">URL do webhook de disparo (POST)</label>
+      <input type="text" id="triggerUrl" placeholder="https://seu-n8n.com/webhook/criar-anuncio">
+    </div>
+    <div class="field">
+      <label for="statusUrl">URL do webhook de status (GET)</label>
+      <input type="text" id="statusUrl" placeholder="https://seu-n8n.com/webhook/status-anuncios">
+    </div>
+    <div class="field">
+      <label for="pollInterval">Atualizar status a cada</label>
+      <select id="pollInterval">
+        <option value="5000">5 segundos</option>
+        <option value="10000" selected>10 segundos</option>
+        <option value="30000">30 segundos</option>
+        <option value="0">Manual (sem atualizar sozinho)</option>
+      </select>
+    </div>
+    <div class="settings-actions">
+      <button class="ghost" id="cancelSettings">Cancelar</button>
+      <button class="primary" id="saveSettings">Salvar</button>
+    </div>
+    <div class="status-line" id="settingsStatus"></div>
+  </section>
+
+  <div class="card">
+    <h2>Novo anúncio</h2>
+    <div class="grid">
+      <div class="field"><label>SKU</label><input type="text" id="f_sku" placeholder="SKU-1042"></div>
+      <div class="field span2"><label>Nome do produto</label><input type="text" id="f_nome" placeholder="Tênis runner pro"></div>
+      <div class="field"><label>Marca</label><input type="text" id="f_marca" placeholder="Nike"></div>
+      <div class="field"><label>Modelo</label><input type="text" id="f_modelo" placeholder="Runner pro"></div>
+      <div class="field"><label>Cor</label><input type="text" id="f_cor" placeholder="Azul"></div>
+      <div class="field"><label>Gênero</label><input type="text" id="f_genero" placeholder="Unissex"></div>
+      <div class="field"><label>EAN</label><input type="text" id="f_ean" placeholder="7891234567890"></div>
+      <div class="field"><label>Custo (R$)</label><input type="text" inputmode="decimal" id="f_custo" placeholder="120,00"></div>
+      <div class="field"><label>Preço de venda (R$)</label><input type="text" inputmode="decimal" id="f_preco" placeholder="249,90"></div>
+      <div class="field">
+        <label>Tem variação?</label>
+        <select id="f_variacao"><option value="Não">Não</option><option value="Sim">Sim</option></select>
+      </div>
+    </div>
+    <hr class="divider">
+    <div class="grid">
+      <div class="field span2"><label>URL imagem frente</label><input type="text" id="f_frente" placeholder="https://drive.google.com/..."></div>
+      <div class="field span2"><label>URL imagem verso</label><input type="text" id="f_verso" placeholder="https://drive.google.com/..."></div>
+    </div>
+    <div class="field" style="margin-top:12px;">
+      <label>Outras imagens (URLs separadas por vírgula)</label>
+      <input type="text" id="f_outras" placeholder="https://..., https://...">
+    </div>
+    <div class="form-actions">
+      <button class="primary" id="submitBtn">Criar anúncio</button>
+    </div>
+    <div class="status-line" id="createStatus"></div>
+  </div>
+
+  <div class="list-head">
+    <h2>Em andamento</h2>
+    <span class="count" id="itemCount"></span>
+  </div>
+  <div id="list"></div>
+
+</div>
+
+<div class="toast" id="toast"></div>
+
+<script>
+const $ = id => document.getElementById(id);
+let settings = { triggerUrl:'', statusUrl:'', pollInterval:10000 };
+let pollTimer = null;
+let busyResumeUrls = new Set();
+
+// ---------- storage ----------
+async function loadSettings(){
+  try{
+    const res = await window.storage.get('settings', false);
+    if(res && res.value){
+      settings = { ...settings, ...JSON.parse(res.value) };
+    }
+  }catch(e){ /* no settings saved yet */ }
+  $('triggerUrl').value = settings.triggerUrl || '';
+  $('statusUrl').value = settings.statusUrl || '';
+  $('pollInterval').value = String(settings.pollInterval ?? 10000);
+  if(!settings.triggerUrl || !settings.statusUrl){
+    $('settingsPanel').classList.add('open');
+  }
+}
+
+async function saveSettingsToStorage(){
+  try{
+    await window.storage.set('settings', JSON.stringify(settings), false);
+  }catch(e){
+    showToast('Não consegui salvar as configurações. Tenta de novo.');
+  }
+}
+
+// ---------- toast ----------
+let toastTimer;
+function showToast(msg){
+  const t = $('toast');
+  t.textContent = msg;
+  t.classList.add('show');
+  clearTimeout(toastTimer);
+  toastTimer = setTimeout(()=> t.classList.remove('show'), 3200);
+}
+
+// ---------- settings panel ----------
+$('settingsToggle').addEventListener('click', ()=>{
+  $('settingsPanel').classList.toggle('open');
+});
+$('cancelSettings').addEventListener('click', ()=>{
+  $('triggerUrl').value = settings.triggerUrl || '';
+  $('statusUrl').value = settings.statusUrl || '';
+  $('settingsPanel').classList.remove('open');
+});
+$('saveSettings').addEventListener('click', async ()=>{
+  settings.triggerUrl = $('triggerUrl').value.trim();
+  settings.statusUrl = $('statusUrl').value.trim();
+  settings.pollInterval = Number($('pollInterval').value);
+  await saveSettingsToStorage();
+  $('settingsStatus').textContent = 'Configurações salvas.';
+  $('settingsStatus').className = 'status-line ok';
+  setTimeout(()=>{ $('settingsStatus').textContent=''; }, 2500);
+  restartPolling();
+  fetchStatus();
+});
+
+// ---------- create ad ----------
+function parseMoney(v){
+  if(!v) return null;
+  const n = Number(String(v).replace(/\./g,'').replace(',','.'));
+  return isNaN(n) ? v : n;
+}
+
+$('submitBtn').addEventListener('click', async ()=>{
+  const statusEl = $('createStatus');
+  if(!settings.triggerUrl){
+    statusEl.textContent = 'Configura a URL do webhook de disparo primeiro (ícone de engrenagem).';
+    statusEl.className = 'status-line err';
+    return;
+  }
+  const sku = $('f_sku').value.trim();
+  const nome = $('f_nome').value.trim();
+  if(!sku || !nome){
+    statusEl.textContent = 'Preenche pelo menos SKU e Nome do produto.';
+    statusEl.className = 'status-line err';
+    return;
+  }
+
+  const payload = {
+    "SKU": sku,
+    "Nome Produto": nome,
+    "Marca": $('f_marca').value.trim(),
+    "Modelo": $('f_modelo').value.trim(),
+    "Cor": $('f_cor').value.trim(),
+    "Gênero": $('f_genero').value.trim(),
+    "EAN": $('f_ean').value.trim(),
+    "Custo": parseMoney($('f_custo').value),
+    "Preço Venda": parseMoney($('f_preco').value),
+    "Tem Variação?": $('f_variacao').value,
+    "url_frente_direta": $('f_frente').value.trim(),
+    "url_verso_direta": $('f_verso').value.trim(),
+    "Imagens_URL_Produto": $('f_outras').value.trim()
+  };
+
+  $('submitBtn').disabled = true;
+  $('submitBtn').textContent = 'Enviando...';
+  statusEl.textContent = '';
+
+  try{
+    const res = await fetch(settings.triggerUrl, {
+      method:'POST',
+      headers:{'Content-Type':'application/json'},
+      body: JSON.stringify(payload)
+    });
+    if(!res.ok){
+      throw new Error('O n8n respondeu com erro ' + res.status);
+    }
+    statusEl.textContent = 'Anúncio enviado. Acompanha o progresso na lista abaixo.';
+    statusEl.className = 'status-line ok';
+    showToast('Anúncio criado: ' + sku);
+    clearForm();
+    setTimeout(fetchStatus, 1200);
+  }catch(e){
+    statusEl.textContent = 'Não consegui enviar. Confere a URL do webhook e o CORS no n8n. (' + e.message + ')';
+    statusEl.className = 'status-line err';
+  }finally{
+    $('submitBtn').disabled = false;
+    $('submitBtn').textContent = 'Criar anúncio';
+  }
+});
+
+function clearForm(){
+  ['f_sku','f_nome','f_marca','f_modelo','f_cor','f_genero','f_ean','f_custo','f_preco','f_frente','f_verso','f_outras']
+    .forEach(id => $(id).value = '');
+  $('f_variacao').value = 'Não';
+}
+
+// ---------- status list ----------
+async function fetchStatus(){
+  const listEl = $('list');
+  if(!settings.statusUrl){
+    listEl.innerHTML = `<div class="empty"><strong>Configura o webhook de status</strong>Sem essa URL não dá pra acompanhar o andamento por aqui — clica na engrenagem no topo.</div>`;
+    $('itemCount').textContent = '';
+    return;
+  }
+  try{
+    const res = await fetch(settings.statusUrl);
+    if(!res.ok) throw new Error('status ' + res.status);
+    const data = await res.json();
+    const items = Array.isArray(data) ? data : (data.items || []);
+    renderList(items);
+  }catch(e){
+    listEl.innerHTML = `<div class="empty"><strong>Não consegui buscar o status</strong>Confere se o webhook de status está ativo no n8n e se o CORS está liberado.</div>`;
+    $('itemCount').textContent = '';
+  }
+}
+
+function renderList(items){
+  const listEl = $('list');
+  $('itemCount').textContent = items.length ? items.length + (items.length===1 ? ' anúncio' : ' anúncios') : '';
+
+  if(!items.length){
+    listEl.innerHTML = `<div class="empty"><strong>Nada em andamento</strong>Crie um anúncio acima para começar.</div>`;
+    return;
+  }
+
+  listEl.innerHTML = items.map(item => itemHtml(item)).join('');
+
+  items.forEach(item => {
+    if(item.resume_url){
+      const approveBtn = document.querySelector(`[data-approve="${cssEscape(item.resume_url)}"]`);
+      const rejectBtn = document.querySelector(`[data-reject="${cssEscape(item.resume_url)}"]`);
+      if(approveBtn) approveBtn.addEventListener('click', ()=> resolveApproval(item.resume_url, true));
+      if(rejectBtn) rejectBtn.addEventListener('click', ()=> resolveApproval(item.resume_url, false));
+    }
+  });
+}
+
+function cssEscape(s){ return (window.CSS && CSS.escape) ? CSS.escape(s) : s.replace(/["\\]/g,'\\$&'); }
+
+function badgeClass(status){
+  const s = (status||'').toLowerCase();
+  if(s.includes('conclu')) return 'concluido';
+  if(s.includes('erro') || s.includes('fal')) return 'erro';
+  if(s.includes('aguard') || s.includes('pend')) return 'aguardando';
+  return 'processando';
+}
+
+function itemHtml(item){
+  const sku = escapeHtml(item.sku || item.SKU || '—');
+  const nome = escapeHtml(item.nome || item['Nome Produto'] || 'Sem nome');
+  const etapa = escapeHtml(item.etapa || item.status || 'Processando');
+  const bClass = badgeClass(item.status);
+  const bLabel = escapeHtml(item.status_label || item.etapa || item.status || 'processando');
+
+  let approvalHtml = '';
+  if(item.imagem_url && item.resume_url){
+    const busy = busyResumeUrls.has(item.resume_url);
+    approvalHtml = `
+      <div class="approval">
+        <img src="${escapeAttr(item.imagem_url)}" alt="Imagem gerada para ${sku}" loading="lazy">
+        <div class="txt">
+          <p>${escapeHtml(item.imagem_legenda || 'Aguardando aprovação desta imagem.')}</p>
+          <div class="actions">
+            <button class="approve" data-approve="${escapeAttr(item.resume_url)}" ${busy?'disabled':''}>✓ Aprovar</button>
+            <button class="reject" data-reject="${escapeAttr(item.resume_url)}" ${busy?'disabled':''}>✕ Reprovar</button>
+          </div>
+        </div>
+      </div>`;
+  } else if(item.mlb_url || item.permalink){
+    const url = item.mlb_url || item.permalink;
+    approvalHtml = `<div class="approval" style="border-top:1px solid var(--line);padding-top:10px;margin-top:10px;">
+      <a class="link-out" href="${escapeAttr(url)}" target="_blank" rel="noopener">Ver anúncio publicado ↗</a>
+    </div>`;
+  }
+
+  return `
+    <div class="item">
+      <div class="tag"><span>${sku}</span></div>
+      <div class="item-body">
+        <div class="item-top">
+          <div>
+            <p class="item-name">${nome}</p>
+            <p class="item-sku">${sku}</p>
+          </div>
+          <span class="badge ${bClass}">${bLabel}</span>
+        </div>
+        ${approvalHtml}
+      </div>
+    </div>`;
+}
+
+function escapeHtml(s){
+  return String(s ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+}
+function escapeAttr(s){ return escapeHtml(s); }
+
+async function resolveApproval(resumeUrl, aprovado){
+  busyResumeUrls.add(resumeUrl);
+  fetchStatus(); // re-render with disabled buttons
+  try{
+    const res = await fetch(resumeUrl, {
+      method:'POST',
+      headers:{'Content-Type':'application/json'},
+      body: JSON.stringify({ aprovado })
+    });
+    if(!res.ok) throw new Error('status ' + res.status);
+    showToast(aprovado ? 'Imagem aprovada.' : 'Imagem reprovada, gerando outra.');
+  }catch(e){
+    showToast('Não consegui enviar a decisão. Tenta de novo.');
+  }finally{
+    busyResumeUrls.delete(resumeUrl);
+    setTimeout(fetchStatus, 800);
+  }
+}
+
+// ---------- polling ----------
+function restartPolling(){
+  if(pollTimer) clearInterval(pollTimer);
+  if(settings.pollInterval && settings.pollInterval > 0){
+    pollTimer = setInterval(fetchStatus, settings.pollInterval);
+  }
+}
+
+// ---------- init ----------
+(async function init(){
+  await loadSettings();
+  await fetchStatus();
+  restartPolling();
+})();
+</script>
+</body>
+</html>
