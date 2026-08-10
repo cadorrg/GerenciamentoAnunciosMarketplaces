@@ -133,7 +133,7 @@
     margin-top:12px;padding-top:12px;border-top:1px solid var(--line);
     display:flex;gap:12px;align-items:flex-start;
   }
-  .approval img{width:80px;height:80px;object-fit:cover;border-radius:7px;background:var(--paper);flex-shrink:0;}
+  .approval img{width:80px;height:80px;object-fit:cover;border-radius:7px;background:var(--paper);flex-shrink:0;cursor:zoom-in;}
   .approval .txt{flex:1;min-width:0;}
   .approval .txt p{margin:0 0 8px;font-size:13px;color:var(--ink-soft);}
   .approval .actions{display:flex;gap:8px;}
@@ -162,6 +162,26 @@
   @media (prefers-reduced-motion: reduce){
     .toast{transition:none;}
   }
+
+  /* lightbox */
+  .lightbox{
+    position:fixed;inset:0;background:rgba(20,21,28,.82);
+    display:none;align-items:center;justify-content:center;
+    padding:40px 20px;z-index:100;cursor:zoom-out;
+  }
+  .lightbox.show{display:flex;}
+  .lightbox img{
+    max-width:100%;max-height:100%;border-radius:10px;
+    box-shadow:0 10px 40px rgba(0,0,0,.4);cursor:default;
+  }
+  .lightbox .close-btn{
+    position:absolute;top:18px;right:22px;
+    width:38px;height:38px;border-radius:50%;
+    background:rgba(255,255,255,.12);color:#fff;border:none;
+    font-size:20px;line-height:1;cursor:pointer;
+    display:flex;align-items:center;justify-content:center;
+  }
+  .lightbox .close-btn:hover{background:rgba(255,255,255,.22);}
 </style>
 </head>
 <body>
@@ -221,6 +241,11 @@
 </div>
 
 <div class="toast" id="toast"></div>
+
+<div class="lightbox" id="lightbox">
+  <button class="close-btn" id="lightboxClose" aria-label="Fechar">✕</button>
+  <img id="lightboxImg" src="" alt="Imagem ampliada">
+</div>
 
 <script>
 // ======================================================
@@ -419,7 +444,7 @@ function itemHtml(item){
     const busy = busyResumeUrls.has(uid);
     approvalHtml = `
       <div class="approval">
-        <img src="${escapeAttr(item.imagem_url)}" alt="Imagem gerada para ${sku}" loading="lazy">
+        <img src="${escapeAttr(item.imagem_url)}" alt="Imagem gerada para ${sku}" loading="lazy" onclick="openLightbox('${escapeAttr(item.imagem_url).replace(/'/g,"\\'")}')">
         <div class="txt">
           <p>${escapeHtml(item.imagem_legenda || 'Aguardando aprovação desta imagem.')}</p>
           <div class="actions">
@@ -476,6 +501,23 @@ async function resolveApproval(item, aprovado){
     setTimeout(fetchStatus, 800);
   }
 }
+
+// ---------- lightbox ----------
+function openLightbox(url){
+  $('lightboxImg').src = url;
+  $('lightbox').classList.add('show');
+}
+function closeLightbox(){
+  $('lightbox').classList.remove('show');
+  $('lightboxImg').src = '';
+}
+$('lightbox').addEventListener('click', (e)=>{
+  if(e.target.id === 'lightbox') closeLightbox();
+});
+$('lightboxClose').addEventListener('click', closeLightbox);
+document.addEventListener('keydown', (e)=>{
+  if(e.key === 'Escape') closeLightbox();
+});
 
 // ---------- polling ----------
 function restartPolling(){
