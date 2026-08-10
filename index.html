@@ -354,6 +354,14 @@ function renderList(items){
   const listEl = $('list');
   $('itemCount').textContent = items.length ? items.length + (items.length===1 ? ' anúncio' : ' anúncios') : '';
 
+  // Limpa da lista de "ocupados" qualquer item que já não esteja mais aguardando aprovação
+  const uidsAguardando = new Set(
+    items.filter(i => (i.status||'').toLowerCase() === 'aguardando').map(itemUid)
+  );
+  for(const uid of Array.from(busyResumeUrls)){
+    if(!uidsAguardando.has(uid)) busyResumeUrls.delete(uid);
+  }
+
   if(!items.length){
     listEl.innerHTML = `<div class="empty"><strong>Nada em andamento</strong>Crie um anúncio acima para começar.</div>`;
     return;
@@ -451,7 +459,6 @@ function escapeAttr(s){ return escapeHtml(s); }
 async function resolveApproval(item, aprovado){
   const uid = itemUid(item);
   busyResumeUrls.add(uid);
-  fetchStatus(); // re-render with disabled buttons
   try{
     const res = await fetch(item.resume_url, {
       method:'POST',
@@ -460,10 +467,12 @@ async function resolveApproval(item, aprovado){
     });
     if(!res.ok) throw new Error('status ' + res.status);
     showToast(aprovado ? 'Imagem aprovada.' : 'Imagem reprovada, gerando outra.');
+    // Sucesso: mantém o botão travado. Só sai da lista de "ocupados"
+    // quando essa etapa realmente sumir do status (deixar de ser 'aguardando').
   }catch(e){
     showToast('Não consegui enviar a decisão. Tenta de novo.');
+    busyResumeUrls.delete(uid); // erro: libera pra tentar de novo
   }finally{
-    busyResumeUrls.delete(uid);
     setTimeout(fetchStatus, 800);
   }
 }
