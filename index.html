@@ -361,15 +361,17 @@ function renderList(items){
 
   items.forEach(item => {
     if(item.resume_url){
-      const approveBtn = document.querySelector(`[data-approve="${cssEscape(item.resume_url)}"]`);
-      const rejectBtn = document.querySelector(`[data-reject="${cssEscape(item.resume_url)}"]`);
-      if(approveBtn) approveBtn.addEventListener('click', ()=> resolveApproval(item.resume_url, true));
-      if(rejectBtn) rejectBtn.addEventListener('click', ()=> resolveApproval(item.resume_url, false));
+      const uid = itemUid(item);
+      const approveBtn = document.querySelector(`[data-approve="${cssEscape(uid)}"]`);
+      const rejectBtn = document.querySelector(`[data-reject="${cssEscape(uid)}"]`);
+      if(approveBtn) approveBtn.addEventListener('click', ()=> resolveApproval(item, true));
+      if(rejectBtn) rejectBtn.addEventListener('click', ()=> resolveApproval(item, false));
     }
   });
 }
 
 function cssEscape(s){ return (window.CSS && CSS.escape) ? CSS.escape(s) : s.replace(/["\\]/g,'\\$&'); }
+function itemUid(item){ return (item.sku || 'semsku') + '::' + (item.etapa || ''); }
 
 function badgeClass(status){
   const s = (status||'').toLowerCase();
@@ -395,15 +397,16 @@ function itemHtml(item){
         </div>
       </div>`;
   } else if(item.imagem_url && item.resume_url){
-    const busy = busyResumeUrls.has(item.resume_url);
+    const uid = itemUid(item);
+    const busy = busyResumeUrls.has(uid);
     approvalHtml = `
       <div class="approval">
         <img src="${escapeAttr(item.imagem_url)}" alt="Imagem gerada para ${sku}" loading="lazy">
         <div class="txt">
           <p>${escapeHtml(item.imagem_legenda || 'Aguardando aprovação desta imagem.')}</p>
           <div class="actions">
-            <button class="approve" data-approve="${escapeAttr(item.resume_url)}" ${busy?'disabled':''}>✓ Aprovar</button>
-            <button class="reject" data-reject="${escapeAttr(item.resume_url)}" ${busy?'disabled':''}>✕ Reprovar</button>
+            <button class="approve" data-approve="${escapeAttr(uid)}" ${busy?'disabled':''}>✓ Aprovar</button>
+            <button class="reject" data-reject="${escapeAttr(uid)}" ${busy?'disabled':''}>✕ Reprovar</button>
           </div>
         </div>
       </div>`;
@@ -435,21 +438,22 @@ function escapeHtml(s){
 }
 function escapeAttr(s){ return escapeHtml(s); }
 
-async function resolveApproval(resumeUrl, aprovado){
-  busyResumeUrls.add(resumeUrl);
+async function resolveApproval(item, aprovado){
+  const uid = itemUid(item);
+  busyResumeUrls.add(uid);
   fetchStatus(); // re-render with disabled buttons
   try{
-    const res = await fetch(resumeUrl, {
+    const res = await fetch(item.resume_url, {
       method:'POST',
       headers:{'Content-Type':'application/json'},
-      body: JSON.stringify({ aprovado })
+      body: JSON.stringify({ aprovado, chave: item.chave || null, sku: item.sku || null, etapa: item.etapa || null })
     });
     if(!res.ok) throw new Error('status ' + res.status);
     showToast(aprovado ? 'Imagem aprovada.' : 'Imagem reprovada, gerando outra.');
   }catch(e){
     showToast('Não consegui enviar a decisão. Tenta de novo.');
   }finally{
-    busyResumeUrls.delete(resumeUrl);
+    busyResumeUrls.delete(uid);
     setTimeout(fetchStatus, 800);
   }
 }
