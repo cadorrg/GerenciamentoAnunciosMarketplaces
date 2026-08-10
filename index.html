@@ -259,8 +259,14 @@
 
   <div class="tab-panel" id="panel-otimizador">
     <div class="info-card">
-      <strong>Roda sozinho</strong>
-      Esse fluxo pega o próximo anúncio pendente da planilha de Precificação e otimiza automaticamente, em dias úteis. Nada pra preencher aqui — só acompanhar e aprovar as imagens abaixo.
+      <strong>Disparo manual</strong>
+      Esse fluxo não roda mais sozinho — clique no botão abaixo sempre que quiser otimizar o próximo anúncio pendente da planilha de Precificação.
+    </div>
+    <div class="card">
+      <div class="form-actions" style="justify-content:flex-start;">
+        <button class="primary" id="runOtimizadorBtn">▶ Rodar otimizador agora</button>
+      </div>
+      <div class="status-line" id="otimizadorStatus"></div>
     </div>
   </div>
 
@@ -289,6 +295,7 @@ const CONFIG = {
     statusUrl: 'https://n8n.coolify.cadoshop.com.br/webhook/status-anuncios'
   },
   otimizador: {
+    triggerUrl: 'https://n8n.coolify.cadoshop.com.br/webhook/otimizar_anuncio',
     statusUrl: 'https://n8n.coolify.cadoshop.com.br/webhook/status-otimizador'
   },
   pollInterval: 10000 // em milissegundos. Use 0 para não atualizar sozinho.
@@ -405,6 +412,35 @@ function clearForm(){
   $('f_produto').value = '';
   $('f_variacao').value = 'Não';
 }
+
+// ---------- run otimizador ----------
+$('runOtimizadorBtn').addEventListener('click', async ()=>{
+  const statusEl = $('otimizadorStatus');
+  if(!settings.otimizador.triggerUrl){
+    statusEl.textContent = 'Falta configurar CONFIG.otimizador.triggerUrl no código do arquivo.';
+    statusEl.className = 'status-line err';
+    return;
+  }
+  $('runOtimizadorBtn').disabled = true;
+  $('runOtimizadorBtn').textContent = 'Iniciando...';
+  statusEl.textContent = '';
+  try{
+    const res = await fetch(settings.otimizador.triggerUrl, { method: 'POST' });
+    if(!res.ok){
+      throw new Error('O n8n respondeu com erro ' + res.status);
+    }
+    statusEl.textContent = 'Otimização iniciada. Acompanha o progresso na lista abaixo.';
+    statusEl.className = 'status-line ok';
+    showToast('Otimizador iniciado');
+    setTimeout(fetchStatus, 1200);
+  }catch(e){
+    statusEl.textContent = 'Não consegui iniciar. Confere a URL do webhook e o CORS no n8n. (' + e.message + ')';
+    statusEl.className = 'status-line err';
+  }finally{
+    $('runOtimizadorBtn').disabled = false;
+    $('runOtimizadorBtn').textContent = '▶ Rodar otimizador agora';
+  }
+});
 
 // ---------- status list ----------
 async function fetchStatus(){
