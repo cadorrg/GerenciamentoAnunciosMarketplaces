@@ -145,7 +145,9 @@
   button.approve:hover{background:#d3f0e1;}
   button.reject{background:var(--red-soft);color:#a52f40;border-color:#f3c3cb;}
   button.reject:hover{background:#f8d4da;}
-  button.approve:disabled, button.reject:disabled{opacity:.5;cursor:default;}
+  button.approve:disabled, button.reject:disabled{
+    opacity:1;cursor:default;background:#eceef2;color:#9297a3;border-color:#e2e4ea;
+  }
 
   .link-out{font-size:12.5px;color:var(--blue);text-decoration:none;font-weight:500;}
   .link-out:hover{text-decoration:underline;}
@@ -364,8 +366,16 @@ function renderList(items){
       const uid = itemUid(item);
       const approveBtn = document.querySelector(`[data-approve="${cssEscape(uid)}"]`);
       const rejectBtn = document.querySelector(`[data-reject="${cssEscape(uid)}"]`);
-      if(approveBtn) approveBtn.addEventListener('click', ()=> resolveApproval(item, true));
-      if(rejectBtn) rejectBtn.addEventListener('click', ()=> resolveApproval(item, false));
+      if(approveBtn) approveBtn.addEventListener('click', ()=> {
+        if(approveBtn) approveBtn.disabled = true;
+        if(rejectBtn) rejectBtn.disabled = true;
+        resolveApproval(item, true);
+      });
+      if(rejectBtn) rejectBtn.addEventListener('click', ()=> {
+        if(approveBtn) approveBtn.disabled = true;
+        if(rejectBtn) rejectBtn.disabled = true;
+        resolveApproval(item, false);
+      });
     }
   });
 }
