@@ -1253,7 +1253,24 @@ function renderList(items){
     return;
   }
 
-  listEl.innerHTML = items.map(item => itemHtml(item)).join('');
+  // O mesmo SKU pode aparecer em várias linhas (uma por etapa: início, imagem 1, imagem 2...).
+  // O botão de cancelar deve aparecer só numa delas — prioriza a que estiver "aguardando"
+  // aprovação (é a mais visível), senão a primeira linha não concluída daquele SKU.
+  const cancelIdxPorSku = {};
+  items.forEach((it, idx) => {
+    const sku = it.sku || it.SKU || '';
+    if(!sku || badgeClass(it.status) === 'concluido') return;
+    const atual = cancelIdxPorSku[sku];
+    if(atual === undefined || (badgeClass(items[atual].status) !== 'aguardando' && badgeClass(it.status) === 'aguardando')){
+      cancelIdxPorSku[sku] = idx;
+    }
+  });
+
+  listEl.innerHTML = items.map((item, idx) => {
+    const sku = item.sku || item.SKU || '';
+    const showCancel = activeTab === 'criador' && !!settings.criador.cancelUrl && cancelIdxPorSku[sku] === idx;
+    return itemHtml(item, showCancel);
+  }).join('');
 
   items.forEach(item => {
     if(item.resume_url){
@@ -1287,20 +1304,16 @@ function badgeClass(status){
   return 'processando';
 }
 
-function itemHtml(item){
+function itemHtml(item, showCancel){
   const sku = escapeHtml(item.sku || item.SKU || '—');
   const skuRaw = item.sku || item.SKU || '';
   const nome = escapeHtml(item.nome || item['Nome Produto'] || 'Sem nome');
   const etapa = escapeHtml(item.etapa || item.status || 'Processando');
   const bClass = badgeClass(item.status);
   const bLabel = escapeHtml(item.status_label || item.etapa || item.status || 'processando');
-  const jaConcluido = bClass === 'concluido';
   const jaCancelando = busyCancelUids.has(skuRaw);
 
-  // O botão de cancelar só faz sentido na aba Criador (é a única com o webhook
-  // de cancelamento plugado no n8n) e enquanto o anúncio ainda não foi publicado.
-  const podeCancel = activeTab === 'criador' && !!settings.criador.cancelUrl && !jaConcluido;
-  const cancelBtnHtml = podeCancel
+  const cancelBtnHtml = showCancel
     ? `<div class="form-actions" style="justify-content:flex-start;margin-top:10px;">
         <button class="ghost" data-cancel-item="${escapeAttr(skuRaw)}" style="color:var(--red);border-color:#f3c3cb;" ${jaCancelando?'disabled':''}>${jaCancelando ? 'Cancelando...' : '✕ Cancelar este pedido'}</button>
       </div>`
