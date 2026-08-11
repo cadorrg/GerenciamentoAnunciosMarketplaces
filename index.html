@@ -735,6 +735,37 @@ function showToast(msg){
   toastTimer = setTimeout(()=> t.classList.remove('show'), 3200);
 }
 
+// ---------- copiar texto (com fallback pra contexto não-seguro / sem HTTPS) ----------
+async function copiarTexto(texto){
+  // Método moderno: só funciona em contexto seguro (https:// ou localhost).
+  if(navigator.clipboard && window.isSecureContext){
+    try{
+      await navigator.clipboard.writeText(texto);
+      return true;
+    }catch(e){
+      // cai pro fallback abaixo
+    }
+  }
+  // Fallback: funciona em http:// e file:// também (API antiga, mas ampla compatibilidade).
+  try{
+    const textarea = document.createElement('textarea');
+    textarea.value = texto;
+    textarea.setAttribute('readonly', '');
+    textarea.style.position = 'fixed';
+    textarea.style.left = '-9999px';
+    textarea.style.top = '0';
+    document.body.appendChild(textarea);
+    textarea.focus();
+    textarea.select();
+    textarea.setSelectionRange(0, textarea.value.length);
+    const ok = document.execCommand('copy');
+    document.body.removeChild(textarea);
+    return ok;
+  }catch(e){
+    return false;
+  }
+}
+
 // ---------- create ad ----------
 function parseMoney(v){
   if(!v) return null;
@@ -1053,18 +1084,19 @@ function renderManualPending(items){
 
   // copiar prompt individual
   area.querySelectorAll('[data-copy-etapa]').forEach(btn => {
-    btn.addEventListener('click', async ()=>{
+    btn.addEventListener('click', ()=>{
       const etapa = btn.getAttribute('data-copy-etapa');
       const p = prompts.find(x => String(x.etapa) === String(etapa));
       if(!p) return;
-      try{
-        await navigator.clipboard.writeText(p.prompt);
-        btn.textContent = 'Copiado!';
-        btn.classList.add('copied');
-        setTimeout(()=>{ btn.textContent = 'Copiar'; btn.classList.remove('copied'); }, 1500);
-      }catch(e){
-        showToast('Não consegui copiar automaticamente. Copie manualmente.');
-      }
+      copiarTexto(p.prompt).then(ok=>{
+        if(ok){
+          btn.textContent = 'Copiado!';
+          btn.classList.add('copied');
+          setTimeout(()=>{ btn.textContent = 'Copiar'; btn.classList.remove('copied'); }, 1500);
+        } else {
+          showToast('Não consegui copiar automaticamente. Copie manualmente.');
+        }
+      });
     });
   });
 
