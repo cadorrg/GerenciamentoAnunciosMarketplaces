@@ -120,7 +120,6 @@
   .item-top{display:flex;justify-content:space-between;align-items:flex-start;gap:10px;}
   .item-name{font-weight:600;font-size:14.5px;margin:0;}
   .item-sku{font-family:'IBM Plex Mono',monospace;font-size:12px;color:var(--ink-soft);margin:2px 0 0;}
-  .item-top-right{display:flex;align-items:flex-start;gap:8px;flex-shrink:0;}
   .badge{
     font-size:11.5px;font-weight:600;padding:4px 10px;border-radius:20px;white-space:nowrap;
     flex-shrink:0;
@@ -129,14 +128,6 @@
   .badge.processando{background:var(--blue-soft);color:#2551a8;}
   .badge.concluido{background:var(--green-soft);color:#1c7847;}
   .badge.erro{background:var(--red-soft);color:#a52f40;}
-
-  button.cancel-item{
-    background:transparent;border:none;color:var(--ink-soft);
-    font-size:12px;font-weight:600;cursor:pointer;padding:4px 2px;font-family:inherit;
-    flex-shrink:0;
-  }
-  button.cancel-item:hover{color:var(--red);}
-  button.cancel-item:disabled{color:#c7cad4;cursor:default;}
 
   .approval{
     margin-top:12px;padding-top:12px;border-top:1px solid var(--line);
@@ -1310,7 +1301,9 @@ function itemHtml(item){
   // de cancelamento plugado no n8n) e enquanto o anúncio ainda não foi publicado.
   const podeCancel = activeTab === 'criador' && !!settings.criador.cancelUrl && !jaConcluido;
   const cancelBtnHtml = podeCancel
-    ? `<button class="cancel-item" data-cancel-item="${escapeAttr(skuRaw)}" ${jaCancelando?'disabled':''}>${jaCancelando ? 'Cancelando...' : '✕ Cancelar'}</button>`
+    ? `<div class="form-actions" style="justify-content:flex-start;margin-top:10px;">
+        <button class="ghost" data-cancel-item="${escapeAttr(skuRaw)}" style="color:var(--red);border-color:#f3c3cb;" ${jaCancelando?'disabled':''}>${jaCancelando ? 'Cancelando...' : '✕ Cancelar este pedido'}</button>
+      </div>`
     : '';
 
   let approvalHtml = '';
@@ -1351,12 +1344,10 @@ function itemHtml(item){
             <p class="item-name">${nome}</p>
             <p class="item-sku">${sku}</p>
           </div>
-          <div class="item-top-right">
-            <span class="badge ${bClass}">${bLabel}</span>
-            ${cancelBtnHtml}
-          </div>
+          <span class="badge ${bClass}">${bLabel}</span>
         </div>
         ${approvalHtml}
+        ${cancelBtnHtml}
       </div>
     </div>`;
 }
