@@ -227,6 +227,38 @@
   .platform-panel.active{display:block;}
 
   .empty.soon{border-style:dashed;}
+
+  /* otimizador manual */
+  .manual-ref{display:flex;gap:14px;align-items:center;margin-bottom:16px;}
+  .manual-ref img{width:64px;height:64px;object-fit:cover;border-radius:8px;background:var(--paper);flex-shrink:0;cursor:zoom-in;}
+  .manual-ref .txt p{margin:0;font-size:13px;color:var(--ink-soft);}
+  .manual-ref .txt strong{font-family:'Space Grotesk',sans-serif;font-size:15px;}
+
+  .prompt-card{
+    border:1px solid var(--line);border-radius:9px;padding:12px 14px;margin-bottom:10px;background:var(--paper);
+  }
+  .prompt-card .prompt-head{display:flex;justify-content:space-between;align-items:center;margin-bottom:6px;gap:10px;}
+  .prompt-card .prompt-title{font-weight:600;font-size:13.5px;}
+  .prompt-card .prompt-text{
+    font-family:'IBM Plex Mono',monospace;font-size:11.5px;line-height:1.5;color:var(--ink-soft);
+    white-space:pre-wrap;max-height:110px;overflow-y:auto;background:var(--surface);
+    border:1px solid var(--line);border-radius:6px;padding:8px 10px;margin:0;
+  }
+  button.copy-btn{
+    background:var(--surface);border:1px solid var(--line);border-radius:6px;
+    padding:5px 10px;font-size:12px;font-weight:600;cursor:pointer;color:var(--ink-soft);
+    font-family:inherit;flex-shrink:0;
+  }
+  button.copy-btn:hover{border-color:var(--ink-soft);color:var(--ink);}
+  button.copy-btn.copied{background:var(--green-soft);color:#1c7847;border-color:#bfe6d2;}
+
+  .upload-grid{display:grid;grid-template-columns:repeat(auto-fit, minmax(220px,1fr));gap:10px;margin:16px 0;}
+  .upload-slot{
+    border:1.5px dashed var(--line);border-radius:9px;padding:10px 12px;font-size:12.5px;
+  }
+  .upload-slot label{display:block;font-weight:600;color:var(--ink);margin-bottom:6px;font-size:12.5px;}
+  .upload-slot input[type=file]{width:100%;font-size:12px;}
+  .upload-slot.filled{border-color:var(--green);border-style:solid;background:var(--green-soft);}
 </style>
 </head>
 <body>
@@ -265,6 +297,7 @@
     <div class="tabs">
       <button class="tab-btn active" id="tabBtnCriador" data-tab="criador">Criador de Anúncios</button>
       <button class="tab-btn" id="tabBtnOtimizador" data-tab="otimizador">Otimizador de Anúncios</button>
+      <button class="tab-btn" id="tabBtnOtimizadorManual" data-tab="otimizadorManual">Otimizador Manual</button>
     </div>
 
     <div class="tab-panel active" id="panel-criador">
@@ -322,6 +355,22 @@
       </div>
     </div>
 
+    <div class="tab-panel" id="panel-otimizador-manual">
+      <div class="info-card">
+        <strong>Como funciona</strong>
+        Clique em rodar. Quando os 6 prompts aparecerem abaixo, copie cada um, gere as imagens na ferramenta de IA que preferir e depois envie os 6 arquivos aqui mesmo — sem WhatsApp, sem Drive.
+      </div>
+      <div class="card">
+        <div class="form-actions" style="justify-content:flex-start;">
+          <button class="primary" id="runOtimizadorManualBtn">▶ Rodar otimizador manual agora</button>
+          <a class="ghost" href="https://drive.google.com/drive/folders/1iUnHryjorNYfdIogmbNYOXkNNkL5bk2i" target="_blank" rel="noopener" style="text-decoration:none;display:inline-flex;align-items:center;">🎬 Ver pasta de vídeos</a>
+        </div>
+        <div class="status-line" id="otimizadorManualStatus"></div>
+      </div>
+
+      <div id="manualPendingArea"></div>
+    </div>
+
   </div>
 
   <div class="platform-panel" id="platform-shopee">
@@ -368,11 +417,13 @@
     </div>
   </div>
 
-  <div class="list-head">
-    <h2>Em andamento</h2>
-    <span class="count" id="itemCount"></span>
+  <div id="sharedListWrap">
+    <div class="list-head">
+      <h2>Em andamento</h2>
+      <span class="count" id="itemCount"></span>
+    </div>
+    <div id="list"></div>
   </div>
-  <div id="list"></div>
 
 </div>
 
@@ -395,6 +446,11 @@ const CONFIG = {
   otimizador: {
     triggerUrl: 'https://n8n.coolify.cadoshop.com.br/webhook/otimizar_anuncio_ml',
     statusUrl: 'https://n8n.coolify.cadoshop.com.br/webhook/status-otimizador'
+  },
+  otimizadorManual: {
+    triggerUrl: 'https://n8n.coolify.cadoshop.com.br/webhook/otimizar_anuncio_ml_manual',
+    statusUrl: 'https://n8n.coolify.cadoshop.com.br/webhook/status-otimizador-manual',
+    uploadUrl: 'https://n8n.coolify.cadoshop.com.br/webhook/upload-imagens-manual'
   },
   shopee: {
     cadastroTriggerUrl: 'https://n8n.coolify.cadoshop.com.br/webhook/shopee_cadastrar_produto',
@@ -426,8 +482,14 @@ function switchPlatform(platform){
   $('platform-shopee').classList.toggle('active', platform === 'shopee');
   activeTab = (platform === 'ml') ? lastMlTab : 'shopee';
   busyResumeUrls.clear();
-  fetchStatus();
-  restartPolling();
+  $('sharedListWrap').style.display = (activeTab === 'otimizadorManual') ? 'none' : '';
+  if(activeTab === 'otimizadorManual'){
+    restartManualPolling();
+  } else {
+    stopManualPolling();
+    fetchStatus();
+    restartPolling();
+  }
 }
 
 // ---------- tabs (dentro do Mercado Livre) ----------
@@ -436,13 +498,26 @@ function switchTab(tab){
   lastMlTab = tab;
   $('tabBtnCriador').classList.toggle('active', tab === 'criador');
   $('tabBtnOtimizador').classList.toggle('active', tab === 'otimizador');
+  $('tabBtnOtimizadorManual').classList.toggle('active', tab === 'otimizadorManual');
   $('panel-criador').classList.toggle('active', tab === 'criador');
   $('panel-otimizador').classList.toggle('active', tab === 'otimizador');
+  $('panel-otimizador-manual').classList.toggle('active', tab === 'otimizadorManual');
   busyResumeUrls.clear();
-  fetchStatus();
+
+  // A aba "Otimizador Manual" tem sua própria lista (prompts + upload) — a lista
+  // genérica "Em andamento" não faz sentido pra ela, então escondemos as duas.
+  $('sharedListWrap').style.display = (tab === 'otimizadorManual') ? 'none' : '';
+
+  if(tab === 'otimizadorManual'){
+    restartManualPolling();
+  } else {
+    stopManualPolling();
+    fetchStatus();
+  }
 }
 $('tabBtnCriador').addEventListener('click', ()=> switchTab('criador'));
 $('tabBtnOtimizador').addEventListener('click', ()=> switchTab('otimizador'));
+$('tabBtnOtimizadorManual').addEventListener('click', ()=> switchTab('otimizadorManual'));
 
 // ---------- run shopee ----------
 async function runShopee(triggerUrl, btnId, statusElId, label){
@@ -657,6 +732,203 @@ $('runOtimizadorBtn').addEventListener('click', async ()=>{
     $('runOtimizadorBtn').textContent = '▶ Rodar otimizador agora';
   }
 });
+
+// ---------- run otimizador manual ----------
+$('runOtimizadorManualBtn').addEventListener('click', async ()=>{
+  const statusEl = $('otimizadorManualStatus');
+  if(!settings.otimizadorManual.triggerUrl){
+    statusEl.textContent = 'Falta configurar CONFIG.otimizadorManual.triggerUrl no código do arquivo.';
+    statusEl.className = 'status-line err';
+    return;
+  }
+  $('runOtimizadorManualBtn').disabled = true;
+  $('runOtimizadorManualBtn').textContent = 'Iniciando...';
+  statusEl.textContent = '';
+  try{
+    const res = await fetch(settings.otimizadorManual.triggerUrl, { method: 'POST' });
+    if(!res.ok) throw new Error('O n8n respondeu com erro ' + res.status);
+    statusEl.textContent = 'Otimização manual iniciada. Os prompts aparecem abaixo assim que ficarem prontos.';
+    statusEl.className = 'status-line ok';
+    showToast('Otimizador manual iniciado');
+    setTimeout(fetchManualStatus, 1500);
+  }catch(e){
+    statusEl.textContent = 'Não consegui iniciar. Confere a URL do webhook e o CORS no n8n. (' + e.message + ')';
+    statusEl.className = 'status-line err';
+  }finally{
+    $('runOtimizadorManualBtn').disabled = false;
+    $('runOtimizadorManualBtn').textContent = '▶ Rodar otimizador manual agora';
+  }
+});
+
+// ---------- otimizador manual: prompts + upload ----------
+let manualPollTimer = null;
+let manualSelectedFiles = {}; // { etapa: File }
+let manualCurrentSku = null;
+
+function restartManualPolling(){
+  fetchManualStatus();
+  stopManualPolling();
+  manualPollTimer = setInterval(fetchManualStatus, settings.pollInterval || 10000);
+}
+function stopManualPolling(){
+  if(manualPollTimer){ clearInterval(manualPollTimer); manualPollTimer = null; }
+}
+
+async function fetchManualStatus(){
+  const area = $('manualPendingArea');
+  const statusUrl = settings.otimizadorManual.statusUrl;
+  if(!statusUrl){
+    area.innerHTML = `<div class="empty"><strong>Configura o webhook de status</strong>Edita CONFIG.otimizadorManual.statusUrl no código do arquivo.</div>`;
+    return;
+  }
+  try{
+    const res = await fetch(statusUrl);
+    if(!res.ok) throw new Error('status ' + res.status);
+    const data = await res.json();
+    const items = Array.isArray(data) ? data : (data.items || []);
+    renderManualPending(items);
+  }catch(e){
+    area.innerHTML = `<div class="empty"><strong>Não consegui buscar os prompts</strong>Confere se o webhook de status está ativo no n8n e se o CORS está liberado.</div>`;
+  }
+}
+
+function renderManualPending(items){
+  const area = $('manualPendingArea');
+  const item = items && items.length ? items[0] : null;
+
+  if(!item){
+    area.innerHTML = `<div class="empty"><strong>Nada aguardando imagens</strong>Clique em "Rodar otimizador manual agora" pra buscar o próximo anúncio pendente.</div>`;
+    manualCurrentSku = null;
+    manualSelectedFiles = {};
+    return;
+  }
+
+  // se mudou de produto (novo SKU), limpa seleção de arquivos anterior
+  if(manualCurrentSku !== item.sku){
+    manualCurrentSku = item.sku;
+    manualSelectedFiles = {};
+  }
+
+  const prompts = item.prompts || [];
+
+  const refHtml = item.imagem_referencia ? `
+    <div class="manual-ref">
+      <img src="${escapeAttr(item.imagem_referencia)}" alt="Foto atual do anúncio" loading="lazy" onclick="openLightbox('${escapeAttr(item.imagem_referencia).replace(/'/g,"\\'")}')">
+      <div class="txt">
+        <strong>${escapeHtml(item.nome || 'Produto')}</strong>
+        <p>${escapeHtml(item.sku || '')} — use esta foto como referência de produto/embalagem em todos os prompts.</p>
+      </div>
+    </div>` : '';
+
+  const promptsHtml = prompts.map(p => `
+    <div class="prompt-card">
+      <div class="prompt-head">
+        <span class="prompt-title">${escapeHtml(p.etapa)}. ${escapeHtml(p.nome)}</span>
+        <button class="copy-btn" type="button" data-copy-etapa="${escapeAttr(p.etapa)}">Copiar</button>
+      </div>
+      <pre class="prompt-text">${escapeHtml(p.prompt)}</pre>
+    </div>`).join('');
+
+  const uploadHtml = prompts.map(p => `
+    <div class="upload-slot" id="uploadSlot_${p.etapa}">
+      <label>${escapeHtml(p.etapa)}. ${escapeHtml(p.nome)}</label>
+      <input type="file" accept="image/*" data-etapa="${escapeAttr(p.etapa)}">
+    </div>`).join('');
+
+  area.innerHTML = `
+    <div class="card">
+      <h2>Prompts das 6 imagens</h2>
+      ${refHtml}
+      ${promptsHtml}
+    </div>
+    <div class="card">
+      <h2>Enviar as 6 imagens criadas</h2>
+      <p class="sub" style="margin-bottom:12px;">Selecione o arquivo gerado pra cada etapa (pode ser em qualquer ordem) e clique em enviar.</p>
+      <div class="upload-grid">${uploadHtml}</div>
+      <div class="form-actions" style="justify-content:flex-start;">
+        <button class="primary" id="enviarImagensBtn">📤 Enviar imagens</button>
+      </div>
+      <div class="status-line" id="manualUploadStatus"></div>
+    </div>`;
+
+  // copiar prompt individual
+  area.querySelectorAll('[data-copy-etapa]').forEach(btn => {
+    btn.addEventListener('click', async ()=>{
+      const etapa = btn.getAttribute('data-copy-etapa');
+      const p = prompts.find(x => String(x.etapa) === String(etapa));
+      if(!p) return;
+      try{
+        await navigator.clipboard.writeText(p.prompt);
+        btn.textContent = 'Copiado!';
+        btn.classList.add('copied');
+        setTimeout(()=>{ btn.textContent = 'Copiar'; btn.classList.remove('copied'); }, 1500);
+      }catch(e){
+        showToast('Não consegui copiar automaticamente. Copie manualmente.');
+      }
+    });
+  });
+
+  // seleção de arquivos
+  area.querySelectorAll('.upload-slot input[type=file]').forEach(input => {
+    input.addEventListener('change', ()=>{
+      const etapa = input.getAttribute('data-etapa');
+      const slot = $('uploadSlot_' + etapa);
+      if(input.files && input.files[0]){
+        manualSelectedFiles[etapa] = input.files[0];
+        slot.classList.add('filled');
+      } else {
+        delete manualSelectedFiles[etapa];
+        slot.classList.remove('filled');
+      }
+    });
+  });
+
+  const enviarBtn = $('enviarImagensBtn');
+  if(enviarBtn) enviarBtn.addEventListener('click', ()=> enviarImagensManual(prompts, item.sku));
+}
+
+async function enviarImagensManual(prompts, sku){
+  const statusEl = $('manualUploadStatus');
+  const etapasEsperadas = prompts.map(p => String(p.etapa));
+  const faltando = etapasEsperadas.filter(e => !manualSelectedFiles[e]);
+  if(faltando.length){
+    statusEl.textContent = `Falta selecionar a(s) imagem(ns) da(s) etapa(s): ${faltando.join(', ')}.`;
+    statusEl.className = 'status-line err';
+    return;
+  }
+  if(!settings.otimizadorManual.uploadUrl){
+    statusEl.textContent = 'Falta configurar CONFIG.otimizadorManual.uploadUrl no código do arquivo.';
+    statusEl.className = 'status-line err';
+    return;
+  }
+
+  const fd = new FormData();
+  fd.append('sku', sku || '');
+  etapasEsperadas.forEach(etapa => {
+    const file = manualSelectedFiles[etapa];
+    fd.append('imagem_' + etapa, file, file.name);
+  });
+
+  const btn = $('enviarImagensBtn');
+  btn.disabled = true;
+  btn.textContent = 'Enviando...';
+  statusEl.textContent = '';
+
+  try{
+    const res = await fetch(settings.otimizadorManual.uploadUrl, { method: 'POST', body: fd });
+    if(!res.ok) throw new Error('O n8n respondeu com erro ' + res.status);
+    statusEl.textContent = 'Imagens enviadas! O anúncio será publicado em instantes.';
+    statusEl.className = 'status-line ok';
+    showToast('Imagens enviadas: ' + (sku || ''));
+    manualSelectedFiles = {};
+    setTimeout(fetchManualStatus, 1500);
+  }catch(e){
+    statusEl.textContent = 'Não consegui enviar as imagens. Confere a URL do webhook e o CORS no n8n. (' + e.message + ')';
+    statusEl.className = 'status-line err';
+    btn.disabled = false;
+    btn.textContent = '📤 Enviar imagens';
+  }
+}
 
 // ---------- status list ----------
 async function fetchStatus(){
