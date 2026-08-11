@@ -120,6 +120,7 @@
   .item-top{display:flex;justify-content:space-between;align-items:flex-start;gap:10px;}
   .item-name{font-weight:600;font-size:14.5px;margin:0;}
   .item-sku{font-family:'IBM Plex Mono',monospace;font-size:12px;color:var(--ink-soft);margin:2px 0 0;}
+  .item-top-right{display:flex;align-items:flex-start;gap:8px;flex-shrink:0;}
   .badge{
     font-size:11.5px;font-weight:600;padding:4px 10px;border-radius:20px;white-space:nowrap;
     flex-shrink:0;
@@ -128,6 +129,14 @@
   .badge.processando{background:var(--blue-soft);color:#2551a8;}
   .badge.concluido{background:var(--green-soft);color:#1c7847;}
   .badge.erro{background:var(--red-soft);color:#a52f40;}
+
+  button.cancel-item{
+    background:transparent;border:none;color:var(--ink-soft);
+    font-size:12px;font-weight:600;cursor:pointer;padding:4px 2px;font-family:inherit;
+    flex-shrink:0;
+  }
+  button.cancel-item:hover{color:var(--red);}
+  button.cancel-item:disabled{color:#c7cad4;cursor:default;}
 
   .approval{
     margin-top:12px;padding-top:12px;border-top:1px solid var(--line);
@@ -286,6 +295,7 @@
     <p class="sub" style="margin:0 0 10px;font-weight:600;color:var(--ink);">Mercado Livre — Criador de Anúncios</p>
     <div class="field"><label>URL do gatilho (criar anúncio)</label><input type="text" id="cfg_criador_trigger" placeholder="https://.../webhook/criar_anuncio"></div>
     <div class="field"><label>URL de status</label><input type="text" id="cfg_criador_status" placeholder="https://.../webhook/status-anuncios"></div>
+    <div class="field"><label>URL de cancelamento</label><input type="text" id="cfg_criador_cancel" placeholder="https://.../webhook/cancelar-criador"></div>
 
     <hr class="divider">
     <p class="sub" style="margin:0 0 10px;font-weight:600;color:var(--ink);">Mercado Livre — Otimizador Automático</p>
@@ -487,7 +497,8 @@
 const CONFIG = {
   criador: {
     triggerUrl: 'https://n8n.coolify.cadoshop.com.br/webhook/criar_anuncio',
-    statusUrl: 'https://n8n.coolify.cadoshop.com.br/webhook/status-anuncios'
+    statusUrl: 'https://n8n.coolify.cadoshop.com.br/webhook/status-anuncios',
+    cancelUrl: 'https://n8n.coolify.cadoshop.com.br/webhook/cancelar-criador'
   },
   otimizador: {
     triggerUrl: 'https://n8n.coolify.cadoshop.com.br/webhook/otimizar_anuncio_ml',
@@ -538,12 +549,14 @@ let activePlatform = 'ml';
 let lastMlTab = 'criador';
 let pollTimer = null;
 let busyResumeUrls = new Set();
+let busyCancelUids = new Set();
 
 // ---------- configurações (⚙) ----------
 function fillSettingsForm(){
   $('cfg_pollInterval').value = Math.round((settings.pollInterval||0)/1000);
   $('cfg_criador_trigger').value = settings.criador.triggerUrl || '';
   $('cfg_criador_status').value = settings.criador.statusUrl || '';
+  $('cfg_criador_cancel').value = settings.criador.cancelUrl || '';
   $('cfg_otimizador_trigger').value = settings.otimizador.triggerUrl || '';
   $('cfg_otimizador_status').value = settings.otimizador.statusUrl || '';
   $('cfg_manual_trigger').value = settings.otimizadorManual.triggerUrl || '';
@@ -568,7 +581,8 @@ $('settingsSaveBtn').addEventListener('click', ()=>{
   const novaConfig = {
     criador: {
       triggerUrl: $('cfg_criador_trigger').value.trim(),
-      statusUrl: $('cfg_criador_status').value.trim()
+      statusUrl: $('cfg_criador_status').value.trim(),
+      cancelUrl: $('cfg_criador_cancel').value.trim()
     },
     otimizador: {
       triggerUrl: $('cfg_otimizador_trigger').value.trim(),
@@ -602,6 +616,7 @@ $('settingsSaveBtn').addEventListener('click', ()=>{
 
   // aplica as novas URLs imediatamente, sem precisar recarregar a página
   busyResumeUrls.clear();
+  busyCancelUids.clear();
   stopManualPolling();
   if(activeTab === 'otimizadorManual'){
     restartManualPolling();
@@ -659,6 +674,7 @@ function switchPlatform(platform){
   $('platform-shopee').classList.toggle('active', platform === 'shopee');
   activeTab = (platform === 'ml') ? lastMlTab : 'shopee';
   busyResumeUrls.clear();
+  busyCancelUids.clear();
   $('sharedListWrap').style.display = (activeTab === 'otimizadorManual') ? 'none' : '';
   if(activeTab === 'otimizadorManual'){
     restartManualPolling();
@@ -680,6 +696,7 @@ function switchTab(tab){
   $('panel-otimizador').classList.toggle('active', tab === 'otimizador');
   $('panel-otimizador-manual').classList.toggle('active', tab === 'otimizadorManual');
   busyResumeUrls.clear();
+  busyCancelUids.clear();
 
   // A aba "Otimizador Manual" tem sua própria lista (prompts + upload) — a lista
   // genérica "Em andamento" não faz sentido pra ela, então escondemos as duas.
@@ -1233,6 +1250,12 @@ function renderList(items){
   for(const uid of Array.from(busyResumeUrls)){
     if(!uidsAguardando.has(uid)) busyResumeUrls.delete(uid);
   }
+  // idem pra lista de cancelamentos "em andamento" — se o item sumiu da lista
+  // (foi cancelado com sucesso, ou concluiu antes), libera o registro de "ocupado"
+  const skusPresentes = new Set(items.map(i => i.sku || i.SKU || ''));
+  for(const sku of Array.from(busyCancelUids)){
+    if(!skusPresentes.has(sku)) busyCancelUids.delete(sku);
+  }
 
   if(!items.length){
     listEl.innerHTML = `<div class="empty"><strong>Nada em andamento</strong>Crie um anúncio acima para começar.</div>`;
@@ -1257,6 +1280,8 @@ function renderList(items){
         resolveApproval(item, false);
       });
     }
+    const cancelBtn = document.querySelector(`[data-cancel-item="${cssEscape(item.sku || item.SKU || '')}"]`);
+    if(cancelBtn) cancelBtn.addEventListener('click', ()=> cancelarItemCriador(item));
   });
 }
 
@@ -1273,10 +1298,20 @@ function badgeClass(status){
 
 function itemHtml(item){
   const sku = escapeHtml(item.sku || item.SKU || '—');
+  const skuRaw = item.sku || item.SKU || '';
   const nome = escapeHtml(item.nome || item['Nome Produto'] || 'Sem nome');
   const etapa = escapeHtml(item.etapa || item.status || 'Processando');
   const bClass = badgeClass(item.status);
   const bLabel = escapeHtml(item.status_label || item.etapa || item.status || 'processando');
+  const jaConcluido = bClass === 'concluido';
+  const jaCancelando = busyCancelUids.has(skuRaw);
+
+  // O botão de cancelar só faz sentido na aba Criador (é a única com o webhook
+  // de cancelamento plugado no n8n) e enquanto o anúncio ainda não foi publicado.
+  const podeCancel = activeTab === 'criador' && !!settings.criador.cancelUrl && !jaConcluido;
+  const cancelBtnHtml = podeCancel
+    ? `<button class="cancel-item" data-cancel-item="${escapeAttr(skuRaw)}" ${jaCancelando?'disabled':''}>${jaCancelando ? 'Cancelando...' : '✕ Cancelar'}</button>`
+    : '';
 
   let approvalHtml = '';
   if(item.status && item.status.toLowerCase().includes('erro')){
@@ -1316,7 +1351,10 @@ function itemHtml(item){
             <p class="item-name">${nome}</p>
             <p class="item-sku">${sku}</p>
           </div>
-          <span class="badge ${bClass}">${bLabel}</span>
+          <div class="item-top-right">
+            <span class="badge ${bClass}">${bLabel}</span>
+            ${cancelBtnHtml}
+          </div>
         </div>
         ${approvalHtml}
       </div>
@@ -1344,6 +1382,37 @@ async function resolveApproval(item, aprovado){
   }catch(e){
     showToast('Não consegui enviar a decisão. Tenta de novo.');
     busyResumeUrls.delete(uid); // erro: libera pra tentar de novo
+  }finally{
+    setTimeout(fetchStatus, 800);
+  }
+}
+
+async function cancelarItemCriador(item){
+  const sku = item.sku || item.SKU || '';
+  if(!settings.criador.cancelUrl){
+    showToast('Falta configurar CONFIG.criador.cancelUrl.');
+    return;
+  }
+  const confirmado = confirm(
+    `Cancelar a criação do anúncio "${item.nome || item['Nome Produto'] || sku}"?\n\nO anúncio não será publicado e o pedido ficará marcado como cancelado.`
+  );
+  if(!confirmado) return;
+
+  busyCancelUids.add(sku);
+  const cancelBtn = document.querySelector(`[data-cancel-item="${cssEscape(sku)}"]`);
+  if(cancelBtn){ cancelBtn.disabled = true; cancelBtn.textContent = 'Cancelando...'; }
+
+  try{
+    const res = await fetch(settings.criador.cancelUrl, {
+      method: 'POST',
+      headers: {'Content-Type': 'application/json'},
+      body: JSON.stringify({ sku })
+    });
+    if(!res.ok) throw new Error('status ' + res.status);
+    showToast('Cancelamento enviado: ' + sku);
+  }catch(e){
+    showToast('Não consegui cancelar. Tenta de novo. (' + e.message + ')');
+    busyCancelUids.delete(sku);
   }finally{
     setTimeout(fetchStatus, 800);
   }
