@@ -297,6 +297,7 @@
     <div class="field"><label>URL do gatilho</label><input type="text" id="cfg_manual_trigger" placeholder="https://.../webhook/otimizar_anuncio_ml_manual"></div>
     <div class="field"><label>URL de status (prompts pendentes)</label><input type="text" id="cfg_manual_status" placeholder="https://.../webhook/status-otimizador-manual"></div>
     <div class="field"><label>URL de upload das imagens</label><input type="text" id="cfg_manual_upload" placeholder="https://.../webhook/upload-imagens-manual"></div>
+    <div class="field"><label>URL de cancelamento</label><input type="text" id="cfg_manual_cancel" placeholder="https://.../webhook/cancelar-otimizador-manual"></div>
 
     <hr class="divider">
     <p class="sub" style="margin:0 0 10px;font-weight:600;color:var(--ink);">Shopee</p>
@@ -495,7 +496,8 @@ const CONFIG = {
   otimizadorManual: {
     triggerUrl: 'https://n8n.coolify.cadoshop.com.br/webhook/otimizar_anuncio_ml_manual',
     statusUrl: 'https://n8n.coolify.cadoshop.com.br/webhook/status-otimizador-manual',
-    uploadUrl: 'https://n8n.coolify.cadoshop.com.br/webhook/upload-imagens-manual'
+    uploadUrl: 'https://n8n.coolify.cadoshop.com.br/webhook/upload-imagens-manual',
+    cancelUrl: 'https://n8n.coolify.cadoshop.com.br/webhook/cancelar-otimizador-manual'
   },
   shopee: {
     cadastroTriggerUrl: 'https://n8n.coolify.cadoshop.com.br/webhook/shopee_cadastrar_produto',
@@ -547,6 +549,7 @@ function fillSettingsForm(){
   $('cfg_manual_trigger').value = settings.otimizadorManual.triggerUrl || '';
   $('cfg_manual_status').value = settings.otimizadorManual.statusUrl || '';
   $('cfg_manual_upload').value = settings.otimizadorManual.uploadUrl || '';
+  $('cfg_manual_cancel').value = settings.otimizadorManual.cancelUrl || '';
   $('cfg_shopee_cadastro').value = settings.shopee.cadastroTriggerUrl || '';
   $('cfg_shopee_criar').value = settings.shopee.criarTriggerUrl || '';
   $('cfg_shopee_otimizar').value = settings.shopee.otimizarTriggerUrl || '';
@@ -574,7 +577,8 @@ $('settingsSaveBtn').addEventListener('click', ()=>{
     otimizadorManual: {
       triggerUrl: $('cfg_manual_trigger').value.trim(),
       statusUrl: $('cfg_manual_status').value.trim(),
-      uploadUrl: $('cfg_manual_upload').value.trim()
+      uploadUrl: $('cfg_manual_upload').value.trim(),
+      cancelUrl: $('cfg_manual_cancel').value.trim()
     },
     shopee: {
       cadastroTriggerUrl: $('cfg_shopee_cadastro').value.trim(),
@@ -1071,6 +1075,9 @@ function renderManualPending(items){
       <h2>Prompts das 6 imagens</h2>
       ${refHtml}
       ${promptsHtml}
+      <div class="form-actions" style="justify-content:flex-start;margin-top:4px;">
+        <button class="ghost" id="cancelarPedidoBtn" style="color:var(--red);border-color:#f3c3cb;">✕ Cancelar este pedido</button>
+      </div>
     </div>
     <div class="card">
       <h2>Enviar as 6 imagens criadas</h2>
@@ -1117,6 +1124,38 @@ function renderManualPending(items){
 
   const enviarBtn = $('enviarImagensBtn');
   if(enviarBtn) enviarBtn.addEventListener('click', ()=> enviarImagensManual(prompts, item.sku));
+
+  const cancelarBtn = $('cancelarPedidoBtn');
+  if(cancelarBtn) cancelarBtn.addEventListener('click', ()=> cancelarPedidoManual(item.sku, item.nome));
+}
+
+async function cancelarPedidoManual(sku, nome){
+  if(!settings.otimizadorManual.cancelUrl){
+    showToast('Falta configurar CONFIG.otimizadorManual.cancelUrl.');
+    return;
+  }
+  const confirmado = confirm(
+    `Cancelar o pedido de "${nome || sku}"?\n\nEsse produto ficará marcado como CANCELADO na planilha e não será selecionado automaticamente de novo.`
+  );
+  if(!confirmado) return;
+
+  const btn = $('cancelarPedidoBtn');
+  if(btn){ btn.disabled = true; btn.textContent = 'Cancelando...'; }
+
+  try{
+    const res = await fetch(settings.otimizadorManual.cancelUrl, {
+      method: 'POST',
+      headers: {'Content-Type': 'application/json'},
+      body: JSON.stringify({ sku })
+    });
+    if(!res.ok) throw new Error('status ' + res.status);
+    showToast('Pedido cancelado: ' + (sku || ''));
+    manualLastRenderedKey = null; // força redesenhar mesmo que o próximo poll pareça "igual"
+    setTimeout(fetchManualStatus, 1000);
+  }catch(e){
+    showToast('Não consegui cancelar. Tenta de novo. (' + e.message + ')');
+    if(btn){ btn.disabled = false; btn.textContent = '✕ Cancelar este pedido'; }
+  }
 }
 
 async function enviarImagensManual(prompts, sku){
