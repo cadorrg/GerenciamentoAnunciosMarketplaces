@@ -325,9 +325,38 @@
   </div>
 
   <div class="platform-panel" id="platform-shopee">
+    <div class="card">
+      <h2>Cadastrar novo produto (fila de criação Shopee)</h2>
+      <div class="grid">
+        <div class="field"><label>SKU</label><input type="text" id="s_sku" placeholder="SKU-1042"></div>
+        <div class="field span2"><label>Nome do produto</label><input type="text" id="s_nome" placeholder="Tênis runner pro"></div>
+        <div class="field"><label>Marca</label><input type="text" id="s_marca" placeholder="Nike"></div>
+        <div class="field"><label>Custo (R$)</label><input type="text" inputmode="decimal" id="s_custo" placeholder="120,00"></div>
+      </div>
+      <hr class="divider">
+      <div class="grid">
+        <div class="field span2">
+          <label>Imagem frente (arquivo)</label>
+          <input type="file" id="s_frente" accept="image/*">
+        </div>
+        <div class="field span2">
+          <label>Imagem verso (arquivo)</label>
+          <input type="file" id="s_verso" accept="image/*">
+        </div>
+      </div>
+      <div class="field" style="margin-top:12px;">
+        <label>Foto do produto (visão geral, arquivo)</label>
+        <input type="file" id="s_produto" accept="image/*">
+      </div>
+      <div class="form-actions">
+        <button class="primary" id="cadastrarShopeeBtn">Cadastrar produto</button>
+      </div>
+      <div class="status-line" id="cadastroShopeeStatus"></div>
+    </div>
+
     <div class="info-card">
       <strong>Disparo manual</strong>
-      Criação e otimização da Shopee rodam no mesmo fluxo — use os botões abaixo pra disparar cada um. Os dois alimentam a mesma lista de acompanhamento logo abaixo.
+      Criação e otimização da Shopee rodam no mesmo fluxo — use os botões abaixo pra disparar cada um. Cadastrar só coloca o produto na fila; "Criar próximo pendente" é quem efetivamente processa. Os dois alimentam a mesma lista de acompanhamento logo abaixo.
     </div>
     <div class="card">
       <div class="form-actions" style="justify-content:flex-start;gap:10px;">
@@ -368,6 +397,7 @@ const CONFIG = {
     statusUrl: 'https://n8n.coolify.cadoshop.com.br/webhook/status-otimizador'
   },
   shopee: {
+    cadastroTriggerUrl: 'https://n8n.coolify.cadoshop.com.br/webhook/shopee_cadastrar_produto',
     criarTriggerUrl: 'https://n8n.coolify.cadoshop.com.br/webhook/shopee_criar_anuncio',
     otimizarTriggerUrl: 'https://n8n.coolify.cadoshop.com.br/webhook/shopee_otimizar_anuncio',
     statusUrl: 'https://n8n.coolify.cadoshop.com.br/webhook/status-shopee'
@@ -537,6 +567,66 @@ function clearForm(){
   $('f_verso').value = '';
   $('f_produto').value = '';
   $('f_variacao').value = 'Não';
+}
+
+// ---------- cadastro shopee ----------
+$('cadastrarShopeeBtn').addEventListener('click', async ()=>{
+  const statusEl = $('cadastroShopeeStatus');
+  if(!settings.shopee.cadastroTriggerUrl){
+    statusEl.textContent = 'Falta configurar CONFIG.shopee.cadastroTriggerUrl no código do arquivo.';
+    statusEl.className = 'status-line err';
+    return;
+  }
+  const sku = $('s_sku').value.trim();
+  const nome = $('s_nome').value.trim();
+  const frenteFile = $('s_frente').files[0];
+  const versoFile = $('s_verso').files[0];
+  const produtoFile = $('s_produto').files[0];
+  if(!sku || !nome){
+    statusEl.textContent = 'Preenche pelo menos SKU e Nome do produto.';
+    statusEl.className = 'status-line err';
+    return;
+  }
+  if(!frenteFile || !versoFile || !produtoFile){
+    statusEl.textContent = 'Seleciona as três fotos (frente, verso e produto) antes de enviar.';
+    statusEl.className = 'status-line err';
+    return;
+  }
+
+  const fd = new FormData();
+  fd.append('SKU', sku);
+  fd.append('Nome Produto', nome);
+  fd.append('Marca', $('s_marca').value.trim());
+  fd.append('Custo', parseMoney($('s_custo').value) ?? '');
+  fd.append('frente', frenteFile, frenteFile.name);
+  fd.append('verso', versoFile, versoFile.name);
+  fd.append('produto', produtoFile, produtoFile.name);
+
+  $('cadastrarShopeeBtn').disabled = true;
+  $('cadastrarShopeeBtn').textContent = 'Enviando...';
+  statusEl.textContent = '';
+
+  try{
+    const res = await fetch(settings.shopee.cadastroTriggerUrl, { method: 'POST', body: fd });
+    if(!res.ok) throw new Error('O n8n respondeu com erro ' + res.status);
+    statusEl.textContent = 'Produto cadastrado na fila. Clique em "Criar próximo pendente" quando quiser processar.';
+    statusEl.className = 'status-line ok';
+    showToast('Produto cadastrado: ' + sku);
+    clearShopeeForm();
+  }catch(e){
+    statusEl.textContent = 'Não consegui enviar. Confere a URL do webhook e o CORS no n8n. (' + e.message + ')';
+    statusEl.className = 'status-line err';
+  }finally{
+    $('cadastrarShopeeBtn').disabled = false;
+    $('cadastrarShopeeBtn').textContent = 'Cadastrar produto';
+  }
+});
+
+function clearShopeeForm(){
+  ['s_sku','s_nome','s_marca','s_custo'].forEach(id => $(id).value = '');
+  $('s_frente').value = '';
+  $('s_verso').value = '';
+  $('s_produto').value = '';
 }
 
 // ---------- run otimizador ----------
