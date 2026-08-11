@@ -804,14 +804,20 @@ async function fetchManualStatus(){
   }
 }
 
+let manualLastRenderedKey = null;
+
 function renderManualPending(items){
   const area = $('manualPendingArea');
   const item = items && items.length ? items[0] : null;
 
   if(!item){
-    area.innerHTML = `<div class="empty"><strong>Nada aguardando imagens</strong>Clique em "Rodar otimizador manual agora" pra buscar o próximo anúncio pendente.</div>`;
+    // Só redesenha o "vazio" se não estava vazio antes — evita piscar/resetar à toa.
+    if(manualLastRenderedKey !== null){
+      area.innerHTML = `<div class="empty"><strong>Nada aguardando imagens</strong>Clique em "Rodar otimizador manual agora" pra buscar o próximo anúncio pendente.</div>`;
+    }
     manualCurrentSku = null;
     manualSelectedFiles = {};
+    manualLastRenderedKey = null;
     return;
   }
 
@@ -822,6 +828,15 @@ function renderManualPending(items){
   }
 
   const prompts = item.prompts || [];
+
+  // Chave de "nada mudou de verdade": mesmo SKU, mesma quantidade de prompts, mesmo status.
+  // Se bater com a última renderização, NÃO redesenha — isso preserva os <input type=file>
+  // já preenchidos na tela (redesenhar do zero cria inputs novos e "apaga" a seleção visual).
+  const renderKey = item.sku + '::' + prompts.length + '::' + (item.status || '');
+  if(renderKey === manualLastRenderedKey){
+    return;
+  }
+  manualLastRenderedKey = renderKey;
 
   const refHtml = item.imagem_referencia ? `
     <div class="manual-ref">
