@@ -269,7 +269,49 @@
       <h1>Central de Anúncios</h1>
       <p class="sub">Cria e acompanha anúncios dos seus marketplaces sem abrir o n8n.</p>
     </div>
+    <button class="icon-btn" id="settingsBtn" title="Configurações" aria-label="Configurações">
+      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+        <path d="M12 15a3 3 0 100-6 3 3 0 000 6z" stroke="currentColor" stroke-width="1.8"/>
+        <path d="M19.4 15a1.65 1.65 0 00.33 1.82l.06.06a2 2 0 11-2.83 2.83l-.06-.06a1.65 1.65 0 00-1.82-.33 1.65 1.65 0 00-1 1.51V21a2 2 0 11-4 0v-.09a1.65 1.65 0 00-1-1.51 1.65 1.65 0 00-1.82.33l-.06.06a2 2 0 11-2.83-2.83l.06-.06a1.65 1.65 0 00.33-1.82 1.65 1.65 0 00-1.51-1H3a2 2 0 110-4h.09a1.65 1.65 0 001.51-1 1.65 1.65 0 00-.33-1.82l-.06-.06a2 2 0 112.83-2.83l.06.06a1.65 1.65 0 001.82.33H9a1.65 1.65 0 001-1.51V3a2 2 0 114 0v.09a1.65 1.65 0 001 1.51 1.65 1.65 0 001.82-.33l.06-.06a2 2 0 112.83 2.83l-.06.06a1.65 1.65 0 00-.33 1.82V9a1.65 1.65 0 001.51 1H21a2 2 0 110 4h-.09a1.65 1.65 0 00-1.51 1z" stroke="currentColor" stroke-width="1.8"/>
+      </svg>
+    </button>
   </header>
+
+  <div class="settings" id="settingsPanel">
+    <h2>Configurações — URLs dos webhooks do n8n</h2>
+
+    <div class="field"><label>Intervalo de atualização automática (segundos)</label><input type="text" inputmode="numeric" id="cfg_pollInterval" placeholder="10"></div>
+
+    <hr class="divider">
+    <p class="sub" style="margin:0 0 10px;font-weight:600;color:var(--ink);">Mercado Livre — Criador de Anúncios</p>
+    <div class="field"><label>URL do gatilho (criar anúncio)</label><input type="text" id="cfg_criador_trigger" placeholder="https://.../webhook/criar_anuncio"></div>
+    <div class="field"><label>URL de status</label><input type="text" id="cfg_criador_status" placeholder="https://.../webhook/status-anuncios"></div>
+
+    <hr class="divider">
+    <p class="sub" style="margin:0 0 10px;font-weight:600;color:var(--ink);">Mercado Livre — Otimizador Automático</p>
+    <div class="field"><label>URL do gatilho</label><input type="text" id="cfg_otimizador_trigger" placeholder="https://.../webhook/otimizar_anuncio_ml"></div>
+    <div class="field"><label>URL de status</label><input type="text" id="cfg_otimizador_status" placeholder="https://.../webhook/status-otimizador"></div>
+
+    <hr class="divider">
+    <p class="sub" style="margin:0 0 10px;font-weight:600;color:var(--ink);">Mercado Livre — Otimizador Manual</p>
+    <div class="field"><label>URL do gatilho</label><input type="text" id="cfg_manual_trigger" placeholder="https://.../webhook/otimizar_anuncio_ml_manual"></div>
+    <div class="field"><label>URL de status (prompts pendentes)</label><input type="text" id="cfg_manual_status" placeholder="https://.../webhook/status-otimizador-manual"></div>
+    <div class="field"><label>URL de upload das imagens</label><input type="text" id="cfg_manual_upload" placeholder="https://.../webhook/upload-imagens-manual"></div>
+
+    <hr class="divider">
+    <p class="sub" style="margin:0 0 10px;font-weight:600;color:var(--ink);">Shopee</p>
+    <div class="field"><label>URL de cadastro (fila)</label><input type="text" id="cfg_shopee_cadastro" placeholder="https://.../webhook/shopee_cadastrar_produto"></div>
+    <div class="field"><label>URL de criação</label><input type="text" id="cfg_shopee_criar" placeholder="https://.../webhook/shopee_criar_anuncio"></div>
+    <div class="field"><label>URL de otimização</label><input type="text" id="cfg_shopee_otimizar" placeholder="https://.../webhook/shopee_otimizar_anuncio"></div>
+    <div class="field"><label>URL de status</label><input type="text" id="cfg_shopee_status" placeholder="https://.../webhook/status-shopee"></div>
+
+    <div class="status-line" id="settingsTestResult"></div>
+    <div class="settings-actions">
+      <button class="ghost" id="settingsTestBtn" type="button">Testar conexões</button>
+      <button class="ghost" id="settingsResetBtn" type="button">Restaurar padrão</button>
+      <button class="primary" id="settingsSaveBtn" type="button">Salvar configurações</button>
+    </div>
+  </div>
 
   <div class="platform-tabs">
     <button class="platform-tab active" id="platformBtnMl" data-platform="ml">
@@ -436,7 +478,10 @@
 
 <script>
 // ======================================================
-// COLE SUAS URLS DO N8N AQUI (é só isso que precisa editar)
+// Estes valores são só o PADRÃO inicial (exemplo). Depois de publicado,
+// cada cliente configura as próprias URLs na aba de Configurações (⚙),
+// que ficam salvas no navegador dele (localStorage) — não precisa mexer
+// neste código pra usar com outro cliente/instância de n8n.
 // ======================================================
 const CONFIG = {
   criador: {
@@ -462,13 +507,141 @@ const CONFIG = {
 };
 // ======================================================
 
+const SETTINGS_STORAGE_KEY = 'cadoshopDashboardConfig_v1';
+
 const $ = id => document.getElementById(id);
-let settings = { ...CONFIG };
+
+function loadSettings(){
+  try{
+    const saved = localStorage.getItem(SETTINGS_STORAGE_KEY);
+    if(!saved) return { ...CONFIG };
+    const parsed = JSON.parse(saved);
+    // merge raso por seção, garantindo que qualquer campo novo que eu adicione
+    // no futuro sempre tenha um valor padrão de CONFIG mesmo em configs antigas salvas
+    return {
+      criador: { ...CONFIG.criador, ...(parsed.criador||{}) },
+      otimizador: { ...CONFIG.otimizador, ...(parsed.otimizador||{}) },
+      otimizadorManual: { ...CONFIG.otimizadorManual, ...(parsed.otimizadorManual||{}) },
+      shopee: { ...CONFIG.shopee, ...(parsed.shopee||{}) },
+      pollInterval: (typeof parsed.pollInterval === 'number') ? parsed.pollInterval : CONFIG.pollInterval
+    };
+  }catch(e){
+    return { ...CONFIG };
+  }
+}
+
+let settings = loadSettings();
 let activeTab = 'criador'; // 'criador' | 'otimizador' (ML) | 'shopee'
 let activePlatform = 'ml';
 let lastMlTab = 'criador';
 let pollTimer = null;
 let busyResumeUrls = new Set();
+
+// ---------- configurações (⚙) ----------
+function fillSettingsForm(){
+  $('cfg_pollInterval').value = Math.round((settings.pollInterval||0)/1000);
+  $('cfg_criador_trigger').value = settings.criador.triggerUrl || '';
+  $('cfg_criador_status').value = settings.criador.statusUrl || '';
+  $('cfg_otimizador_trigger').value = settings.otimizador.triggerUrl || '';
+  $('cfg_otimizador_status').value = settings.otimizador.statusUrl || '';
+  $('cfg_manual_trigger').value = settings.otimizadorManual.triggerUrl || '';
+  $('cfg_manual_status').value = settings.otimizadorManual.statusUrl || '';
+  $('cfg_manual_upload').value = settings.otimizadorManual.uploadUrl || '';
+  $('cfg_shopee_cadastro').value = settings.shopee.cadastroTriggerUrl || '';
+  $('cfg_shopee_criar').value = settings.shopee.criarTriggerUrl || '';
+  $('cfg_shopee_otimizar').value = settings.shopee.otimizarTriggerUrl || '';
+  $('cfg_shopee_status').value = settings.shopee.statusUrl || '';
+}
+
+$('settingsBtn').addEventListener('click', ()=>{
+  fillSettingsForm();
+  $('settingsTestResult').textContent = '';
+  $('settingsTestResult').className = 'status-line';
+  $('settingsPanel').classList.toggle('open');
+});
+
+$('settingsSaveBtn').addEventListener('click', ()=>{
+  const pollSeconds = Number($('cfg_pollInterval').value);
+  const novaConfig = {
+    criador: {
+      triggerUrl: $('cfg_criador_trigger').value.trim(),
+      statusUrl: $('cfg_criador_status').value.trim()
+    },
+    otimizador: {
+      triggerUrl: $('cfg_otimizador_trigger').value.trim(),
+      statusUrl: $('cfg_otimizador_status').value.trim()
+    },
+    otimizadorManual: {
+      triggerUrl: $('cfg_manual_trigger').value.trim(),
+      statusUrl: $('cfg_manual_status').value.trim(),
+      uploadUrl: $('cfg_manual_upload').value.trim()
+    },
+    shopee: {
+      cadastroTriggerUrl: $('cfg_shopee_cadastro').value.trim(),
+      criarTriggerUrl: $('cfg_shopee_criar').value.trim(),
+      otimizarTriggerUrl: $('cfg_shopee_otimizar').value.trim(),
+      statusUrl: $('cfg_shopee_status').value.trim()
+    },
+    pollInterval: (isNaN(pollSeconds) || pollSeconds <= 0) ? 0 : pollSeconds * 1000
+  };
+
+  try{
+    localStorage.setItem(SETTINGS_STORAGE_KEY, JSON.stringify(novaConfig));
+  }catch(e){
+    showToast('Não consegui salvar no navegador (localStorage indisponível).');
+    return;
+  }
+
+  settings = novaConfig;
+  $('settingsPanel').classList.remove('open');
+  showToast('Configurações salvas neste navegador');
+
+  // aplica as novas URLs imediatamente, sem precisar recarregar a página
+  busyResumeUrls.clear();
+  stopManualPolling();
+  if(activeTab === 'otimizadorManual'){
+    restartManualPolling();
+  } else {
+    fetchStatus();
+    restartPolling();
+  }
+});
+
+$('settingsResetBtn').addEventListener('click', ()=>{
+  if(!confirm('Isso apaga as configurações salvas neste navegador e volta pros valores de exemplo. Continuar?')) return;
+  localStorage.removeItem(SETTINGS_STORAGE_KEY);
+  settings = { ...CONFIG };
+  fillSettingsForm();
+  showToast('Configurações restauradas ao padrão');
+});
+
+$('settingsTestBtn').addEventListener('click', async ()=>{
+  const resultEl = $('settingsTestResult');
+  resultEl.textContent = 'Testando...';
+  resultEl.className = 'status-line';
+
+  const alvos = [
+    ['Criador', $('cfg_criador_status').value.trim()],
+    ['Otimizador', $('cfg_otimizador_status').value.trim()],
+    ['Otimizador Manual', $('cfg_manual_status').value.trim()],
+    ['Shopee', $('cfg_shopee_status').value.trim()]
+  ];
+
+  const resultados = await Promise.all(alvos.map(async ([nome, url])=>{
+    if(!url) return `${nome}: sem URL`;
+    try{
+      const res = await fetch(url);
+      return `${nome}: ${res.ok ? 'OK' : 'erro ' + res.status}`;
+    }catch(e){
+      return `${nome}: falhou (CORS ou offline)`;
+    }
+  }));
+
+  const algumErro = resultados.some(r => !r.includes('OK') && !r.includes('sem URL'));
+  resultEl.textContent = resultados.join(' · ');
+  resultEl.className = 'status-line ' + (algumErro ? 'err' : 'ok');
+});
+
 
 // ---------- platform tabs (marketplace) ----------
 $('platformBtnMl').addEventListener('click', ()=> switchPlatform('ml'));
