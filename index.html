@@ -785,7 +785,19 @@ async function fetchManualStatus(){
     const res = await fetch(statusUrl);
     if(!res.ok) throw new Error('status ' + res.status);
     const data = await res.json();
-    const items = Array.isArray(data) ? data : (data.items || []);
+    // O n8n devolve um ARRAY quando há vários itens pendentes, mas devolve
+    // o OBJETO sozinho (sem colchetes) quando há exatamente 1 item pendente.
+    // Também cobre o formato { items: [...] } por segurança.
+    let items;
+    if(Array.isArray(data)){
+      items = data;
+    } else if(data && Array.isArray(data.items)){
+      items = data.items;
+    } else if(data && typeof data === 'object' && Object.keys(data).length){
+      items = [data];
+    } else {
+      items = [];
+    }
     renderManualPending(items);
   }catch(e){
     area.innerHTML = `<div class="empty"><strong>Não consegui buscar os prompts</strong>Confere se o webhook de status está ativo no n8n e se o CORS está liberado.</div>`;
