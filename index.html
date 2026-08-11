@@ -322,20 +322,28 @@
       </div>
     </div>
 
-    <div class="list-head">
-      <h2>Em andamento</h2>
-      <span class="count" id="itemCount"></span>
-    </div>
-    <div id="list"></div>
-
   </div>
 
   <div class="platform-panel" id="platform-shopee">
-    <div class="empty soon">
-      <strong>Shopee ainda não está configurado</strong>
-      Assim que os fluxos de criação e otimização da Shopee estiverem prontos no n8n, essa aba passa a funcionar igual à do Mercado Livre.
+    <div class="info-card">
+      <strong>Disparo manual</strong>
+      Criação e otimização da Shopee rodam no mesmo fluxo — use os botões abaixo pra disparar cada um. Os dois alimentam a mesma lista de acompanhamento logo abaixo.
+    </div>
+    <div class="card">
+      <div class="form-actions" style="justify-content:flex-start;gap:10px;">
+        <button class="primary" id="runShopeeCriarBtn">▶ Criar próximo pendente</button>
+        <button class="primary" id="runShopeeOtimizarBtn">▶ Otimizar próximo pendente</button>
+        <a class="ghost" href="https://drive.google.com/drive/folders/1iUnHryjorNYfdIogmbNYOXkNNkL5bk2i" target="_blank" rel="noopener" style="text-decoration:none;display:inline-flex;align-items:center;">🎬 Ver pasta de vídeos</a>
+      </div>
+      <div class="status-line" id="shopeeStatus"></div>
     </div>
   </div>
+
+  <div class="list-head">
+    <h2>Em andamento</h2>
+    <span class="count" id="itemCount"></span>
+  </div>
+  <div id="list"></div>
 
 </div>
 
@@ -359,13 +367,20 @@ const CONFIG = {
     triggerUrl: 'https://n8n.coolify.cadoshop.com.br/webhook/otimizar_anuncio_ml',
     statusUrl: 'https://n8n.coolify.cadoshop.com.br/webhook/status-otimizador'
   },
+  shopee: {
+    criarTriggerUrl: 'https://n8n.coolify.cadoshop.com.br/webhook/shopee_criar_anuncio',
+    otimizarTriggerUrl: 'https://n8n.coolify.cadoshop.com.br/webhook/shopee_otimizar_anuncio',
+    statusUrl: 'https://n8n.coolify.cadoshop.com.br/webhook/status-shopee'
+  },
   pollInterval: 10000 // em milissegundos. Use 0 para não atualizar sozinho.
 };
 // ======================================================
 
 const $ = id => document.getElementById(id);
 let settings = { ...CONFIG };
-let activeTab = 'criador';
+let activeTab = 'criador'; // 'criador' | 'otimizador' (ML) | 'shopee'
+let activePlatform = 'ml';
+let lastMlTab = 'criador';
 let pollTimer = null;
 let busyResumeUrls = new Set();
 
@@ -374,21 +389,21 @@ $('platformBtnMl').addEventListener('click', ()=> switchPlatform('ml'));
 $('platformBtnShopee').addEventListener('click', ()=> switchPlatform('shopee'));
 
 function switchPlatform(platform){
+  activePlatform = platform;
   $('platformBtnMl').classList.toggle('active', platform === 'ml');
   $('platformBtnShopee').classList.toggle('active', platform === 'shopee');
   $('platform-ml').classList.toggle('active', platform === 'ml');
   $('platform-shopee').classList.toggle('active', platform === 'shopee');
-  if(platform === 'ml'){
-    fetchStatus();
-    restartPolling();
-  } else if(pollTimer){
-    clearInterval(pollTimer);
-  }
+  activeTab = (platform === 'ml') ? lastMlTab : 'shopee';
+  busyResumeUrls.clear();
+  fetchStatus();
+  restartPolling();
 }
 
-// ---------- tabs ----------
+// ---------- tabs (dentro do Mercado Livre) ----------
 function switchTab(tab){
   activeTab = tab;
+  lastMlTab = tab;
   $('tabBtnCriador').classList.toggle('active', tab === 'criador');
   $('tabBtnOtimizador').classList.toggle('active', tab === 'otimizador');
   $('panel-criador').classList.toggle('active', tab === 'criador');
@@ -398,6 +413,39 @@ function switchTab(tab){
 }
 $('tabBtnCriador').addEventListener('click', ()=> switchTab('criador'));
 $('tabBtnOtimizador').addEventListener('click', ()=> switchTab('otimizador'));
+
+// ---------- run shopee ----------
+async function runShopee(triggerUrl, btnId, statusElId, label){
+  const btn = $(btnId);
+  const statusEl = $(statusElId);
+  if(!triggerUrl){
+    statusEl.textContent = 'Falta configurar a URL desse gatilho no CONFIG.shopee.';
+    statusEl.className = 'status-line err';
+    return;
+  }
+  const originalText = btn.textContent;
+  btn.disabled = true;
+  btn.textContent = 'Iniciando...';
+  statusEl.textContent = '';
+  try{
+    const res = await fetch(triggerUrl, { method: 'POST' });
+    if(!res.ok) throw new Error('O n8n respondeu com erro ' + res.status);
+    statusEl.textContent = label + ' iniciado. Acompanha o progresso na lista abaixo.';
+    statusEl.className = 'status-line ok';
+    showToast(label + ' iniciado');
+    setTimeout(fetchStatus, 1200);
+  }catch(e){
+    statusEl.textContent = 'Não consegui iniciar. Confere a URL do webhook e o CORS no n8n. (' + e.message + ')';
+    statusEl.className = 'status-line err';
+  }finally{
+    btn.disabled = false;
+    btn.textContent = originalText;
+  }
+}
+$('runShopeeCriarBtn').addEventListener('click', ()=>
+  runShopee(settings.shopee.criarTriggerUrl, 'runShopeeCriarBtn', 'shopeeStatus', 'Criação'));
+$('runShopeeOtimizarBtn').addEventListener('click', ()=>
+  runShopee(settings.shopee.otimizarTriggerUrl, 'runShopeeOtimizarBtn', 'shopeeStatus', 'Otimização'));
 
 // ---------- toast ----------
 let toastTimer;
