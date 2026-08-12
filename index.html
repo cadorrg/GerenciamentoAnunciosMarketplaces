@@ -391,9 +391,17 @@
     <div class="tab-panel" id="panel-criador-manual">
       <div class="info-card">
         <strong>Como funciona</strong>
-        Essa etapa aparece sozinha aqui assim que um anúncio criado na aba "Criador de Anúncios" chegar na etapa de fotos. Copie cada prompt, gere as imagens na ferramenta de IA que preferir e envie os arquivos aqui mesmo — sem WhatsApp, sem Drive.
+        Depois de criar um anúncio na aba "Criador de Anúncios" e ele chegar na etapa de fotos, clique no botão abaixo pra buscar o pedido pendente. Copie cada prompt, gere as imagens na ferramenta de IA que preferir e envie os arquivos aqui mesmo — sem WhatsApp, sem Drive.
       </div>
-      <div id="criadorPendingArea"></div>
+      <div class="card">
+        <div class="form-actions" style="justify-content:flex-start;">
+          <button class="primary" id="runCriadorManualBtn">▶ Buscar pedido de fotos pendente</button>
+          <a class="ghost" href="https://drive.google.com/drive/folders/1iUnHryjorNYfdIogmbNYOXkNNkL5bk2i" target="_blank" rel="noopener" style="text-decoration:none;display:inline-flex;align-items:center;">🎬 Ver pasta de vídeos</a>
+        </div>
+        <div class="status-line" id="criadorManualStatus"></div>
+      </div>
+
+      <div id="criadorPendingArea"><div class="empty"><strong>Nada carregado ainda</strong>Clique em "Buscar pedido de fotos pendente" pra ver o que está aguardando.</div></div>
     </div>
 
     <div class="tab-panel" id="panel-otimizador">
@@ -681,7 +689,8 @@ function refreshActiveView(){
     return;
   }
   if(activeTab === 'criadorManual'){
-    criadorManualFlow.restartPolling();
+    // Diferente do Otimizador Manual, aqui NADA busca sozinho — só quando
+    // o botão "Buscar pedido de fotos pendente" é clicado (ver handler abaixo).
     return;
   }
   fetchStatus();
@@ -997,6 +1006,33 @@ $('runOtimizadorManualBtn').addEventListener('click', async ()=>{
   }
 });
 
+// ---------- buscar pedido de fotos pendente (Criador Manual) ----------
+// Diferente do Otimizador Manual, aqui não existe uma fila pra "puxar o próximo":
+// o pedido já foi criado automaticamente pelo fluxo do Criador quando o anúncio
+// chegou na etapa de fotos. O botão só busca (sob demanda) o que já está pronto.
+$('runCriadorManualBtn').addEventListener('click', async ()=>{
+  const statusEl = $('criadorManualStatus');
+  const btn = $('runCriadorManualBtn');
+  if(!settings.criador.promptsStatusUrl){
+    statusEl.textContent = 'Falta configurar CONFIG.criador.promptsStatusUrl no código do arquivo.';
+    statusEl.className = 'status-line err';
+    return;
+  }
+  btn.disabled = true;
+  btn.textContent = 'Buscando...';
+  statusEl.textContent = '';
+  const ok = await criadorManualFlow.restartPolling();
+  if(ok){
+    statusEl.textContent = 'Lista atualizada.';
+    statusEl.className = 'status-line ok';
+  } else {
+    statusEl.textContent = 'Não consegui buscar. Confere a URL do webhook e o CORS no n8n.';
+    statusEl.className = 'status-line err';
+  }
+  btn.disabled = false;
+  btn.textContent = '▶ Buscar pedido de fotos pendente';
+});
+
 // ---------- prompts + upload de imagens manuais (reutilizável) ----------
 // Essa mesma mecânica serve tanto pro Otimizador Manual quanto pro Criador
 // (que agora também usa geração manual de fotos): consulta um webhook de
@@ -1007,12 +1043,17 @@ function createManualImageFlow(opts){
   let pollTimer = null;
   let selectedFiles = {}; // { etapa: File }
   let currentSku = null;
-  let lastRenderedKey = null;
+  // '__unset__' = ainda não fizemos nenhuma busca nessa área (estado inicial).
+  // Isso é DIFERENTE de já ter buscado e não ter achado nada pendente — se
+  // usássemos null pros dois casos, o primeiro resultado vazio nunca
+  // sobrescreveria o placeholder inicial da tela.
+  let lastRenderedKey = '__unset__';
 
-  function restartPolling(){
-    fetchStatus();
+  async function restartPolling(){
+    const ok = await fetchStatus();
     stopPolling();
     pollTimer = setInterval(fetchStatus, settings.pollInterval || 10000);
+    return ok;
   }
   function stopPolling(){
     if(pollTimer){ clearInterval(pollTimer); pollTimer = null; }
@@ -1023,7 +1064,7 @@ function createManualImageFlow(opts){
     const statusUrl = opts.getStatusUrl();
     if(!statusUrl){
       area.innerHTML = `<div class="empty"><strong>Configura o webhook de status</strong>${opts.missingStatusMsg}</div>`;
-      return;
+      return false;
     }
     try{
       const res = await fetch(statusUrl);
@@ -1043,8 +1084,10 @@ function createManualImageFlow(opts){
         items = [];
       }
       renderPending(items);
+      return true;
     }catch(e){
       area.innerHTML = `<div class="empty"><strong>Não consegui buscar os prompts</strong>Confere se o webhook de status está ativo no n8n e se o CORS está liberado.</div>`;
+      return false;
     }
   }
 
@@ -1053,13 +1096,16 @@ function createManualImageFlow(opts){
     const item = items && items.length ? items[0] : null;
 
     if(!item){
-      // Só redesenha o "vazio" se não estava vazio antes — evita piscar/resetar à toa.
-      if(lastRenderedKey !== null){
+      // Só redesenha o "vazio" se a tela não estava mostrando "vazio" antes
+      // (evita piscar/resetar à toa a cada poll) — mas SEMPRE redesenha na
+      // primeira busca (lastRenderedKey ainda '__unset__'), senão o placeholder
+      // inicial da tela nunca seria substituído quando não há nada pendente.
+      if(lastRenderedKey !== 'empty'){
         area.innerHTML = `<div class="empty"><strong>${opts.emptyTitle}</strong>${opts.emptyMsg}</div>`;
       }
       currentSku = null;
       selectedFiles = {};
-      lastRenderedKey = null;
+      lastRenderedKey = 'empty';
       return;
     }
 
