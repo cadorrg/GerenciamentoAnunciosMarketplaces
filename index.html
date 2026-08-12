@@ -342,6 +342,7 @@
 
     <div class="tabs">
       <button class="tab-btn active" id="tabBtnCriador" data-tab="criador">Criador de Anúncios</button>
+      <button class="tab-btn" id="tabBtnCriadorManual" data-tab="criadorManual">Criador Manual</button>
       <button class="tab-btn" id="tabBtnOtimizador" data-tab="otimizador">Otimizador de Anúncios</button>
       <button class="tab-btn" id="tabBtnOtimizadorManual" data-tab="otimizadorManual">Otimizador Manual</button>
     </div>
@@ -385,10 +386,12 @@
         </div>
         <div class="status-line" id="createStatus"></div>
       </div>
+    </div>
 
+    <div class="tab-panel" id="panel-criador-manual">
       <div class="info-card">
-        <strong>Fotos do anúncio: geração manual</strong>
-        Depois de enviar o formulário, o anúncio segue seu processamento normal (categoria, título, descrição, atributos). Quando chegar a vez das fotos, os prompts aparecem aqui embaixo: copie cada um, gere as imagens na ferramenta de IA que preferir e envie os arquivos direto por aqui — sem WhatsApp, sem Drive.
+        <strong>Como funciona</strong>
+        Essa etapa aparece sozinha aqui assim que um anúncio criado na aba "Criador de Anúncios" chegar na etapa de fotos. Copie cada prompt, gere as imagens na ferramenta de IA que preferir e envie os arquivos aqui mesmo — sem WhatsApp, sem Drive.
       </div>
       <div id="criadorPendingArea"></div>
     </div>
@@ -671,14 +674,15 @@ $('platformBtnShopee').addEventListener('click', ()=> switchPlatform('shopee'));
 function refreshActiveView(){
   otimizadorManualFlow.stopPolling();
   criadorManualFlow.stopPolling();
-  $('sharedListWrap').style.display = (activeTab === 'otimizadorManual') ? 'none' : '';
+  $('sharedListWrap').style.display = (activeTab === 'otimizadorManual' || activeTab === 'criadorManual') ? 'none' : '';
 
   if(activeTab === 'otimizadorManual'){
     otimizadorManualFlow.restartPolling();
     return;
   }
-  if(activeTab === 'criador'){
+  if(activeTab === 'criadorManual'){
     criadorManualFlow.restartPolling();
+    return;
   }
   fetchStatus();
   restartPolling();
@@ -701,21 +705,23 @@ function switchTab(tab){
   activeTab = tab;
   lastMlTab = tab;
   $('tabBtnCriador').classList.toggle('active', tab === 'criador');
+  $('tabBtnCriadorManual').classList.toggle('active', tab === 'criadorManual');
   $('tabBtnOtimizador').classList.toggle('active', tab === 'otimizador');
   $('tabBtnOtimizadorManual').classList.toggle('active', tab === 'otimizadorManual');
   $('panel-criador').classList.toggle('active', tab === 'criador');
+  $('panel-criador-manual').classList.toggle('active', tab === 'criadorManual');
   $('panel-otimizador').classList.toggle('active', tab === 'otimizador');
   $('panel-otimizador-manual').classList.toggle('active', tab === 'otimizadorManual');
   busyResumeUrls.clear();
   busyCancelUids.clear();
 
-  // A aba "Otimizador Manual" tem sua própria lista (prompts + upload) — a lista
-  // genérica "Em andamento" não faz sentido pra ela, então escondemos as duas.
-  // A aba "Criador" mostra as duas: a lista geral de acompanhamento e, quando
-  // houver, a área de prompts+upload das fotos do anúncio.
+  // As abas "Criador Manual" e "Otimizador Manual" têm sua própria lista
+  // (prompts + upload) — a lista genérica "Em andamento" não faz sentido
+  // pra elas, então escondemos as duas nesse caso.
   refreshActiveView();
 }
 $('tabBtnCriador').addEventListener('click', ()=> switchTab('criador'));
+$('tabBtnCriadorManual').addEventListener('click', ()=> switchTab('criadorManual'));
 $('tabBtnOtimizador').addEventListener('click', ()=> switchTab('otimizador'));
 $('tabBtnOtimizadorManual').addEventListener('click', ()=> switchTab('otimizadorManual'));
 
@@ -1501,9 +1507,6 @@ function restartPolling(){
 (async function init(){
   await fetchStatus();
   restartPolling();
-  if(activeTab === 'criador'){
-    criadorManualFlow.restartPolling();
-  }
 })();
 </script>
 </body>
