@@ -283,16 +283,17 @@
     <div class="field"><label>Intervalo de atualização automática (segundos)</label><input type="text" inputmode="numeric" id="cfg_pollInterval" placeholder="10"></div>
 
     <hr class="divider">
-    <p class="sub" style="margin:0 0 10px;font-weight:600;color:var(--ink);">Mercado Livre — Criador de Anúncios</p>
+    <p class="sub" style="margin:0 0 10px;font-weight:600;color:var(--ink);">Mercado Livre — Criador de Anúncios (Automático)</p>
     <div class="field"><label>URL do gatilho (criar anúncio)</label><input type="text" id="cfg_criador_trigger" placeholder="https://.../webhook/criar_anuncio"></div>
     <div class="field"><label>URL de status</label><input type="text" id="cfg_criador_status" placeholder="https://.../webhook/status-anuncios"></div>
     <div class="field"><label>URL de cancelamento</label><input type="text" id="cfg_criador_cancel" placeholder="https://.../webhook/cancelar-criador"></div>
 
     <hr class="divider">
-    <p class="sub" style="margin:0 0 10px;font-weight:600;color:var(--ink);">Mercado Livre — Criador Manual</p>
-    <div class="field"><label>URL de status (prompts pendentes)</label><input type="text" id="cfg_criador_prompts_status" placeholder="https://.../webhook/status-criador-manual"></div>
-    <div class="field"><label>URL de upload das imagens</label><input type="text" id="cfg_criador_upload" placeholder="https://.../webhook/upload-imagens-criador"></div>
-    <p class="sub" style="margin:-4px 0 0;font-size:12px;">Usa a mesma URL de cancelamento configurada acima, no Criador de Anúncios.</p>
+    <p class="sub" style="margin:0 0 10px;font-weight:600;color:var(--ink);">Mercado Livre — Criador Manual (fluxo independente)</p>
+    <div class="field"><label>URL do gatilho (criar anúncio manual)</label><input type="text" id="cfg_criadorManual_trigger" placeholder="https://.../webhook/criar_anuncio_manual"></div>
+    <div class="field"><label>URL de status (prompts pendentes)</label><input type="text" id="cfg_criadorManual_status" placeholder="https://.../webhook/status-criador-manual"></div>
+    <div class="field"><label>URL de upload das imagens</label><input type="text" id="cfg_criadorManual_upload" placeholder="https://.../webhook/upload-imagens-criador"></div>
+    <div class="field"><label>URL de cancelamento</label><input type="text" id="cfg_criadorManual_cancel" placeholder="https://.../webhook/cancelar-criador-manual"></div>
 
     <hr class="divider">
     <p class="sub" style="margin:0 0 10px;font-weight:600;color:var(--ink);">Mercado Livre — Otimizador Automático</p>
@@ -395,8 +396,47 @@
     <div class="tab-panel" id="panel-criador-manual">
       <div class="info-card">
         <strong>Como funciona</strong>
-        Depois de criar um anúncio na aba "Criador de Anúncios" e ele chegar na etapa de fotos, clique no botão abaixo pra buscar o pedido pendente. Copie cada prompt, gere as imagens na ferramenta de IA que preferir e envie os arquivos aqui mesmo — sem WhatsApp, sem Drive.
+        Esse é um fluxo 100% separado do Criador automático — preenche o formulário abaixo pra criar um anúncio novo por aqui. Categoria, título, descrição e atributos são processados igual ao automático; só as fotos são diferentes: quando chegar a vez delas, clique em "Buscar pedido de fotos pendente" pra ver os prompts, gere as imagens na ferramenta de IA que preferir e envie os arquivos aqui mesmo — sem WhatsApp, sem Drive.
       </div>
+
+      <div class="card">
+        <h2>Novo anúncio (manual)</h2>
+        <div class="grid">
+          <div class="field"><label>SKU</label><input type="text" id="fm_sku" placeholder="SKU-1042"></div>
+          <div class="field span2"><label>Nome do produto</label><input type="text" id="fm_nome" placeholder="Tênis runner pro"></div>
+          <div class="field"><label>Marca</label><input type="text" id="fm_marca" placeholder="Nike"></div>
+          <div class="field"><label>Modelo</label><input type="text" id="fm_modelo" placeholder="Runner pro"></div>
+          <div class="field"><label>Cor</label><input type="text" id="fm_cor" placeholder="Azul"></div>
+          <div class="field"><label>Gênero</label><input type="text" id="fm_genero" placeholder="Unissex"></div>
+          <div class="field"><label>EAN</label><input type="text" id="fm_ean" placeholder="7891234567890"></div>
+          <div class="field"><label>Custo (R$)</label><input type="text" inputmode="decimal" id="fm_custo" placeholder="120,00"></div>
+          <div class="field"><label>Preço de venda (R$)</label><input type="text" inputmode="decimal" id="fm_preco" placeholder="249,90"></div>
+          <div class="field">
+            <label>Tem variação?</label>
+            <select id="fm_variacao"><option value="Não">Não</option><option value="Sim">Sim</option></select>
+          </div>
+        </div>
+        <hr class="divider">
+        <div class="grid">
+          <div class="field span2">
+            <label>Imagem frente (arquivo)</label>
+            <input type="file" id="fm_frente" accept="image/*">
+          </div>
+          <div class="field span2">
+            <label>Imagem verso (arquivo)</label>
+            <input type="file" id="fm_verso" accept="image/*">
+          </div>
+        </div>
+        <div class="field" style="margin-top:12px;">
+          <label>Foto do produto (visão geral, arquivo)</label>
+          <input type="file" id="fm_produto" accept="image/*">
+        </div>
+        <div class="form-actions">
+          <button class="primary" id="submitManualBtn">Criar anúncio (manual)</button>
+        </div>
+        <div class="status-line" id="createManualStatus"></div>
+      </div>
+
       <div class="card">
         <div class="form-actions" style="justify-content:flex-start;">
           <button class="primary" id="runCriadorManualBtn">▶ Buscar pedido de fotos pendente</button>
@@ -512,9 +552,13 @@ const CONFIG = {
   criador: {
     triggerUrl: 'https://n8n.coolify.cadoshop.com.br/webhook/criar_anuncio',
     statusUrl: 'https://n8n.coolify.cadoshop.com.br/webhook/status-anuncios',
-    promptsStatusUrl: 'https://n8n.coolify.cadoshop.com.br/webhook/status-criador-manual',
-    uploadUrl: 'https://n8n.coolify.cadoshop.com.br/webhook/upload-imagens-criador',
     cancelUrl: 'https://n8n.coolify.cadoshop.com.br/webhook/cancelar-criador'
+  },
+  criadorManual: {
+    triggerUrl: 'https://n8n.coolify.cadoshop.com.br/webhook/criar_anuncio_manual',
+    statusUrl: 'https://n8n.coolify.cadoshop.com.br/webhook/status-criador-manual',
+    uploadUrl: 'https://n8n.coolify.cadoshop.com.br/webhook/upload-imagens-criador',
+    cancelUrl: 'https://n8n.coolify.cadoshop.com.br/webhook/cancelar-criador-manual'
   },
   otimizador: {
     triggerUrl: 'https://n8n.coolify.cadoshop.com.br/webhook/otimizar_anuncio_ml',
@@ -549,6 +593,7 @@ function loadSettings(){
     // no futuro sempre tenha um valor padrão de CONFIG mesmo em configs antigas salvas
     return {
       criador: { ...CONFIG.criador, ...(parsed.criador||{}) },
+      criadorManual: { ...CONFIG.criadorManual, ...(parsed.criadorManual||{}) },
       otimizador: { ...CONFIG.otimizador, ...(parsed.otimizador||{}) },
       otimizadorManual: { ...CONFIG.otimizadorManual, ...(parsed.otimizadorManual||{}) },
       shopee: { ...CONFIG.shopee, ...(parsed.shopee||{}) },
@@ -572,9 +617,11 @@ function fillSettingsForm(){
   $('cfg_pollInterval').value = Math.round((settings.pollInterval||0)/1000);
   $('cfg_criador_trigger').value = settings.criador.triggerUrl || '';
   $('cfg_criador_status').value = settings.criador.statusUrl || '';
-  $('cfg_criador_prompts_status').value = settings.criador.promptsStatusUrl || '';
-  $('cfg_criador_upload').value = settings.criador.uploadUrl || '';
   $('cfg_criador_cancel').value = settings.criador.cancelUrl || '';
+  $('cfg_criadorManual_trigger').value = settings.criadorManual.triggerUrl || '';
+  $('cfg_criadorManual_status').value = settings.criadorManual.statusUrl || '';
+  $('cfg_criadorManual_upload').value = settings.criadorManual.uploadUrl || '';
+  $('cfg_criadorManual_cancel').value = settings.criadorManual.cancelUrl || '';
   $('cfg_otimizador_trigger').value = settings.otimizador.triggerUrl || '';
   $('cfg_otimizador_status').value = settings.otimizador.statusUrl || '';
   $('cfg_manual_trigger').value = settings.otimizadorManual.triggerUrl || '';
@@ -600,9 +647,13 @@ $('settingsSaveBtn').addEventListener('click', ()=>{
     criador: {
       triggerUrl: $('cfg_criador_trigger').value.trim(),
       statusUrl: $('cfg_criador_status').value.trim(),
-      promptsStatusUrl: $('cfg_criador_prompts_status').value.trim(),
-      uploadUrl: $('cfg_criador_upload').value.trim(),
       cancelUrl: $('cfg_criador_cancel').value.trim()
+    },
+    criadorManual: {
+      triggerUrl: $('cfg_criadorManual_trigger').value.trim(),
+      statusUrl: $('cfg_criadorManual_status').value.trim(),
+      uploadUrl: $('cfg_criadorManual_upload').value.trim(),
+      cancelUrl: $('cfg_criadorManual_cancel').value.trim()
     },
     otimizador: {
       triggerUrl: $('cfg_otimizador_trigger').value.trim(),
@@ -655,7 +706,7 @@ $('settingsTestBtn').addEventListener('click', async ()=>{
 
   const alvos = [
     ['Criador', $('cfg_criador_status').value.trim()],
-    ['Criador (prompts)', $('cfg_criador_prompts_status').value.trim()],
+    ['Criador Manual (prompts)', $('cfg_criadorManual_status').value.trim()],
     ['Otimizador', $('cfg_otimizador_status').value.trim()],
     ['Otimizador Manual', $('cfg_manual_status').value.trim()],
     ['Shopee', $('cfg_shopee_status').value.trim()]
@@ -819,80 +870,105 @@ function parseMoney(v){
   return isNaN(n) ? v : n;
 }
 
-$('submitBtn').addEventListener('click', async ()=>{
-  const statusEl = $('createStatus');
-  if(!settings.criador.triggerUrl){
-    statusEl.textContent = 'Falta configurar CONFIG.criador.triggerUrl no código do arquivo.';
-    statusEl.className = 'status-line err';
-    return;
-  }
-  const sku = $('f_sku').value.trim();
-  const nome = $('f_nome').value.trim();
-  const frenteFile = $('f_frente').files[0];
-  const versoFile = $('f_verso').files[0];
-  const produtoFile = $('f_produto').files[0];
-  if(!sku || !nome){
-    statusEl.textContent = 'Preenche pelo menos SKU e Nome do produto.';
-    statusEl.className = 'status-line err';
-    return;
-  }
-  if(!frenteFile || !versoFile || !produtoFile){
-    statusEl.textContent = 'Seleciona as três fotos (frente, verso e produto) antes de enviar.';
-    statusEl.className = 'status-line err';
-    return;
-  }
-
-  const fd = new FormData();
-  fd.append('SKU', sku);
-  fd.append('Nome Produto', nome);
-  fd.append('Marca', $('f_marca').value.trim());
-  fd.append('Modelo', $('f_modelo').value.trim());
-  fd.append('Cor', $('f_cor').value.trim());
-  fd.append('Gênero', $('f_genero').value.trim());
-  fd.append('EAN', $('f_ean').value.trim());
-  fd.append('Custo', parseMoney($('f_custo').value) ?? '');
-  fd.append('Preço Venda', parseMoney($('f_preco').value) ?? '');
-  fd.append('Tem Variação?', $('f_variacao').value);
-  fd.append('frente', frenteFile, frenteFile.name);
-  fd.append('verso', versoFile, versoFile.name);
-  fd.append('produto', produtoFile, produtoFile.name);
-
-  $('submitBtn').disabled = true;
-  $('submitBtn').textContent = 'Enviando...';
-  statusEl.textContent = '';
-
-  try{
-    // Não define Content-Type manualmente: o navegador monta o boundary
-    // correto do multipart/form-data sozinho quando o body é um FormData.
-    const res = await fetch(settings.criador.triggerUrl, {
-      method:'POST',
-      body: fd
-    });
-    if(!res.ok){
-      throw new Error('O n8n respondeu com erro ' + res.status);
+// ---------- criar anúncio (form genérico, reaproveitado pelo Automático e pelo Manual) ----------
+function wireCreateForm(opts){
+  // opts: {prefix, btnId, statusId, getTriggerUrl, missingTriggerMsg, successMsg, onSuccess}
+  $(opts.btnId).addEventListener('click', async ()=>{
+    const statusEl = $(opts.statusId);
+    const triggerUrl = opts.getTriggerUrl();
+    if(!triggerUrl){
+      statusEl.textContent = opts.missingTriggerMsg;
+      statusEl.className = 'status-line err';
+      return;
     }
-    statusEl.textContent = 'Anúncio enviado. Acompanha o progresso na lista abaixo.';
-    statusEl.className = 'status-line ok';
-    showToast('Anúncio criado: ' + sku);
-    clearForm();
-    setTimeout(fetchStatus, 1200);
-  }catch(e){
-    statusEl.textContent = 'Não consegui enviar. Confere a URL do webhook e o CORS no n8n. (' + e.message + ')';
-    statusEl.className = 'status-line err';
-  }finally{
-    $('submitBtn').disabled = false;
-    $('submitBtn').textContent = 'Criar anúncio';
-  }
+    const p = opts.prefix;
+    const sku = $(p + '_sku').value.trim();
+    const nome = $(p + '_nome').value.trim();
+    const frenteFile = $(p + '_frente').files[0];
+    const versoFile = $(p + '_verso').files[0];
+    const produtoFile = $(p + '_produto').files[0];
+    if(!sku || !nome){
+      statusEl.textContent = 'Preenche pelo menos SKU e Nome do produto.';
+      statusEl.className = 'status-line err';
+      return;
+    }
+    if(!frenteFile || !versoFile || !produtoFile){
+      statusEl.textContent = 'Seleciona as três fotos (frente, verso e produto) antes de enviar.';
+      statusEl.className = 'status-line err';
+      return;
+    }
+
+    const fd = new FormData();
+    fd.append('SKU', sku);
+    fd.append('Nome Produto', nome);
+    fd.append('Marca', $(p + '_marca').value.trim());
+    fd.append('Modelo', $(p + '_modelo').value.trim());
+    fd.append('Cor', $(p + '_cor').value.trim());
+    fd.append('Gênero', $(p + '_genero').value.trim());
+    fd.append('EAN', $(p + '_ean').value.trim());
+    fd.append('Custo', parseMoney($(p + '_custo').value) ?? '');
+    fd.append('Preço Venda', parseMoney($(p + '_preco').value) ?? '');
+    fd.append('Tem Variação?', $(p + '_variacao').value);
+    fd.append('frente', frenteFile, frenteFile.name);
+    fd.append('verso', versoFile, versoFile.name);
+    fd.append('produto', produtoFile, produtoFile.name);
+
+    const btn = $(opts.btnId);
+    const originalText = btn.textContent;
+    btn.disabled = true;
+    btn.textContent = 'Enviando...';
+    statusEl.textContent = '';
+
+    try{
+      // Não define Content-Type manualmente: o navegador monta o boundary
+      // correto do multipart/form-data sozinho quando o body é um FormData.
+      const res = await fetch(triggerUrl, { method: 'POST', body: fd });
+      if(!res.ok){
+        throw new Error('O n8n respondeu com erro ' + res.status);
+      }
+      statusEl.textContent = opts.successMsg;
+      statusEl.className = 'status-line ok';
+      showToast('Anúncio criado: ' + sku);
+      clearCreateForm(p);
+      if(opts.onSuccess) opts.onSuccess();
+    }catch(e){
+      statusEl.textContent = 'Não consegui enviar. Confere a URL do webhook e o CORS no n8n. (' + e.message + ')';
+      statusEl.className = 'status-line err';
+    }finally{
+      btn.disabled = false;
+      btn.textContent = originalText;
+    }
+  });
+}
+
+function clearCreateForm(p){
+  [p+'_sku', p+'_nome', p+'_marca', p+'_modelo', p+'_cor', p+'_genero', p+'_ean', p+'_custo', p+'_preco']
+    .forEach(id => $(id).value = '');
+  $(p + '_frente').value = '';
+  $(p + '_verso').value = '';
+  $(p + '_produto').value = '';
+  $(p + '_variacao').value = 'Não';
+}
+
+wireCreateForm({
+  prefix: 'f',
+  btnId: 'submitBtn',
+  statusId: 'createStatus',
+  getTriggerUrl: () => settings.criador.triggerUrl,
+  missingTriggerMsg: 'Falta configurar CONFIG.criador.triggerUrl no código do arquivo.',
+  successMsg: 'Anúncio enviado. Acompanha o progresso na lista abaixo.',
+  onSuccess: () => setTimeout(fetchStatus, 1200)
 });
 
-function clearForm(){
-  ['f_sku','f_nome','f_marca','f_modelo','f_cor','f_genero','f_ean','f_custo','f_preco']
-    .forEach(id => $(id).value = '');
-  $('f_frente').value = '';
-  $('f_verso').value = '';
-  $('f_produto').value = '';
-  $('f_variacao').value = 'Não';
-}
+wireCreateForm({
+  prefix: 'fm',
+  btnId: 'submitManualBtn',
+  statusId: 'createManualStatus',
+  getTriggerUrl: () => settings.criadorManual.triggerUrl,
+  missingTriggerMsg: 'Falta configurar CONFIG.criadorManual.triggerUrl no código do arquivo.',
+  successMsg: 'Anúncio enviado. Quando chegar na etapa de fotos (leva alguns minutos), clique em "Buscar pedido de fotos pendente" aqui embaixo.',
+  onSuccess: null
+});
 
 // ---------- cadastro shopee ----------
 $('cadastrarShopeeBtn').addEventListener('click', async ()=>{
@@ -1011,14 +1087,15 @@ $('runOtimizadorManualBtn').addEventListener('click', async ()=>{
 });
 
 // ---------- buscar pedido de fotos pendente (Criador Manual) ----------
-// Diferente do Otimizador Manual, aqui não existe uma fila pra "puxar o próximo":
-// o pedido já foi criado automaticamente pelo fluxo do Criador quando o anúncio
-// chegou na etapa de fotos. O botão só busca (sob demanda) o que já está pronto.
+// Aqui não existe uma fila pra "puxar o próximo": o pedido só existe depois
+// que você envia o formulário desta mesma aba (que dispara o fluxo
+// independente "criar_anuncio_manual"). O botão busca (sob demanda) o
+// status desse pedido quando ele chegar na etapa de fotos.
 $('runCriadorManualBtn').addEventListener('click', async ()=>{
   const statusEl = $('criadorManualStatus');
   const btn = $('runCriadorManualBtn');
-  if(!settings.criador.promptsStatusUrl){
-    statusEl.textContent = 'Falta configurar CONFIG.criador.promptsStatusUrl no código do arquivo.';
+  if(!settings.criadorManual.statusUrl){
+    statusEl.textContent = 'Falta configurar CONFIG.criadorManual.statusUrl no código do arquivo.';
     statusEl.className = 'status-line err';
     return;
   }
@@ -1305,12 +1382,12 @@ const otimizadorManualFlow = createManualImageFlow({
 
 const criadorManualFlow = createManualImageFlow({
   areaId: 'criadorPendingArea',
-  getStatusUrl: () => settings.criador.promptsStatusUrl,
-  getUploadUrl: () => settings.criador.uploadUrl,
-  getCancelUrl: () => settings.criador.cancelUrl,
-  missingStatusMsg: 'Edita CONFIG.criador.promptsStatusUrl no código do arquivo.',
-  missingUploadMsg: 'Falta configurar CONFIG.criador.uploadUrl no código do arquivo.',
-  missingCancelMsg: 'Falta configurar CONFIG.criador.cancelUrl.',
+  getStatusUrl: () => settings.criadorManual.statusUrl,
+  getUploadUrl: () => settings.criadorManual.uploadUrl,
+  getCancelUrl: () => settings.criadorManual.cancelUrl,
+  missingStatusMsg: 'Edita CONFIG.criadorManual.statusUrl no código do arquivo.',
+  missingUploadMsg: 'Falta configurar CONFIG.criadorManual.uploadUrl no código do arquivo.',
+  missingCancelMsg: 'Falta configurar CONFIG.criadorManual.cancelUrl.',
   emptyTitle: 'Nenhuma foto aguardando envio',
   emptyMsg: 'Assim que um anúncio criado acima chegar na etapa de fotos, os prompts aparecem aqui.'
 });
