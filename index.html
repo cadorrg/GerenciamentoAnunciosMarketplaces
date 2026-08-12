@@ -1315,7 +1315,12 @@ function createManualImageFlow(opts){
     statusEl.textContent = '';
 
     try{
-      const res = await fetch(uploadUrl, { method: 'POST', body: fd });
+      // O SKU vai também na URL (query string), não só no corpo multipart.
+      // Em várias versões do n8n, quando o corpo mistura texto + vários
+      // arquivos binários, o campo de texto às vezes não chega em
+      // $json.body de forma confiável — só os arquivos. Pela URL nunca falha.
+      const urlComSku = uploadUrl + (uploadUrl.includes('?') ? '&' : '?') + 'sku=' + encodeURIComponent(sku || '');
+      const res = await fetch(urlComSku, { method: 'POST', body: fd });
       if(!res.ok) throw new Error('O n8n respondeu com erro ' + res.status);
       statusEl.textContent = 'Imagens enviadas! O anúncio será publicado em instantes.';
       statusEl.className = 'status-line ok';
