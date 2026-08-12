@@ -707,7 +707,7 @@ $('settingsTestBtn').addEventListener('click', async ()=>{
   const resultados = await Promise.all(alvos.map(async ([nome, url])=>{
     if(!url) return `${nome}: sem URL`;
     try{
-      const res = await fetch(url);
+      const res = await fetch(url, { cache: 'no-store' });
       return `${nome}: ${res.ok ? 'OK' : 'erro ' + res.status}`;
     }catch(e){
       return `${nome}: falhou (CORS ou offline)`;
@@ -1113,7 +1113,10 @@ function createManualImageFlow(opts){
       return false;
     }
     try{
-      const res = await fetch(statusUrl);
+      // cache:'no-store' evita que o navegador use ETag/If-None-Match nessas
+      // chamadas — com polling repetido, isso podia gerar 304 Not Modified,
+      // que o fetch() trata como "não ok" em requisições cross-origin.
+      const res = await fetch(statusUrl, { cache: 'no-store' });
       if(!res.ok) throw new Error('status ' + res.status);
       const data = await res.json();
       // O n8n devolve um ARRAY quando há vários itens pendentes, mas devolve
@@ -1372,7 +1375,8 @@ async function fetchStatus(){
     return;
   }
   try{
-    const res = await fetch(statusUrl);
+    // cache:'no-store' evita 304 Not Modified virando "erro" em fetch cross-origin.
+    const res = await fetch(statusUrl, { cache: 'no-store' });
     if(!res.ok) throw new Error('status ' + res.status);
     const data = await res.json();
     const items = Array.isArray(data) ? data : (data.items || []);
