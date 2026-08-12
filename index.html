@@ -437,15 +437,7 @@
         <div class="status-line" id="createManualStatus"></div>
       </div>
 
-      <div class="card">
-        <div class="form-actions" style="justify-content:flex-start;">
-          <button class="primary" id="runCriadorManualBtn">▶ Buscar pedido de fotos pendente</button>
-          <a class="ghost" href="https://drive.google.com/drive/folders/1iUnHryjorNYfdIogmbNYOXkNNkL5bk2i" target="_blank" rel="noopener" style="text-decoration:none;display:inline-flex;align-items:center;">🎬 Ver pasta de vídeos</a>
-        </div>
-        <div class="status-line" id="criadorManualStatus"></div>
-      </div>
-
-      <div id="criadorPendingArea"><div class="empty"><strong>Nada carregado ainda</strong>Clique em "Buscar pedido de fotos pendente" pra ver o que está aguardando.</div></div>
+      <div id="criadorPendingArea"></div>
     </div>
 
     <div class="tab-panel" id="panel-otimizador">
@@ -744,8 +736,9 @@ function refreshActiveView(){
     return;
   }
   if(activeTab === 'criadorManual'){
-    // Diferente do Otimizador Manual, aqui NADA busca sozinho — só quando
-    // o botão "Buscar pedido de fotos pendente" é clicado (ver handler abaixo).
+    // Igual ao Otimizador Manual: assim que a aba abre, já busca e mantém
+    // atualizando sozinho (sem precisar de um botão extra pra "buscar").
+    criadorManualFlow.restartPolling();
     return;
   }
   fetchStatus();
@@ -1084,34 +1077,6 @@ $('runOtimizadorManualBtn').addEventListener('click', async ()=>{
     $('runOtimizadorManualBtn').disabled = false;
     $('runOtimizadorManualBtn').textContent = '▶ Rodar otimizador manual agora';
   }
-});
-
-// ---------- buscar pedido de fotos pendente (Criador Manual) ----------
-// Aqui não existe uma fila pra "puxar o próximo": o pedido só existe depois
-// que você envia o formulário desta mesma aba (que dispara o fluxo
-// independente "criar_anuncio_manual"). O botão busca (sob demanda) o
-// status desse pedido quando ele chegar na etapa de fotos.
-$('runCriadorManualBtn').addEventListener('click', async ()=>{
-  const statusEl = $('criadorManualStatus');
-  const btn = $('runCriadorManualBtn');
-  if(!settings.criadorManual.statusUrl){
-    statusEl.textContent = 'Falta configurar CONFIG.criadorManual.statusUrl no código do arquivo.';
-    statusEl.className = 'status-line err';
-    return;
-  }
-  btn.disabled = true;
-  btn.textContent = 'Buscando...';
-  statusEl.textContent = '';
-  const ok = await criadorManualFlow.restartPolling();
-  if(ok){
-    statusEl.textContent = 'Lista atualizada.';
-    statusEl.className = 'status-line ok';
-  } else {
-    statusEl.textContent = 'Não consegui buscar. Confere a URL do webhook e o CORS no n8n.';
-    statusEl.className = 'status-line err';
-  }
-  btn.disabled = false;
-  btn.textContent = '▶ Buscar pedido de fotos pendente';
 });
 
 // ---------- prompts + upload de imagens manuais (reutilizável) ----------
