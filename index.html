@@ -286,6 +286,8 @@
     <p class="sub" style="margin:0 0 10px;font-weight:600;color:var(--ink);">Mercado Livre — Criador de Anúncios</p>
     <div class="field"><label>URL do gatilho (criar anúncio)</label><input type="text" id="cfg_criador_trigger" placeholder="https://.../webhook/criar_anuncio"></div>
     <div class="field"><label>URL de status</label><input type="text" id="cfg_criador_status" placeholder="https://.../webhook/status-anuncios"></div>
+    <div class="field"><label>URL de status dos prompts (imagens manuais)</label><input type="text" id="cfg_criador_prompts_status" placeholder="https://.../webhook/status-criador-manual"></div>
+    <div class="field"><label>URL de upload das imagens</label><input type="text" id="cfg_criador_upload" placeholder="https://.../webhook/upload-imagens-criador"></div>
     <div class="field"><label>URL de cancelamento</label><input type="text" id="cfg_criador_cancel" placeholder="https://.../webhook/cancelar-criador"></div>
 
     <hr class="divider">
@@ -383,6 +385,12 @@
         </div>
         <div class="status-line" id="createStatus"></div>
       </div>
+
+      <div class="info-card">
+        <strong>Fotos do anúncio: geração manual</strong>
+        Depois de enviar o formulário, o anúncio segue seu processamento normal (categoria, título, descrição, atributos). Quando chegar a vez das fotos, os prompts aparecem aqui embaixo: copie cada um, gere as imagens na ferramenta de IA que preferir e envie os arquivos direto por aqui — sem WhatsApp, sem Drive.
+      </div>
+      <div id="criadorPendingArea"></div>
     </div>
 
     <div class="tab-panel" id="panel-otimizador">
@@ -489,6 +497,8 @@ const CONFIG = {
   criador: {
     triggerUrl: 'https://n8n.coolify.cadoshop.com.br/webhook/criar_anuncio',
     statusUrl: 'https://n8n.coolify.cadoshop.com.br/webhook/status-anuncios',
+    promptsStatusUrl: 'https://n8n.coolify.cadoshop.com.br/webhook/status-criador-manual',
+    uploadUrl: 'https://n8n.coolify.cadoshop.com.br/webhook/upload-imagens-criador',
     cancelUrl: 'https://n8n.coolify.cadoshop.com.br/webhook/cancelar-criador'
   },
   otimizador: {
@@ -547,6 +557,8 @@ function fillSettingsForm(){
   $('cfg_pollInterval').value = Math.round((settings.pollInterval||0)/1000);
   $('cfg_criador_trigger').value = settings.criador.triggerUrl || '';
   $('cfg_criador_status').value = settings.criador.statusUrl || '';
+  $('cfg_criador_prompts_status').value = settings.criador.promptsStatusUrl || '';
+  $('cfg_criador_upload').value = settings.criador.uploadUrl || '';
   $('cfg_criador_cancel').value = settings.criador.cancelUrl || '';
   $('cfg_otimizador_trigger').value = settings.otimizador.triggerUrl || '';
   $('cfg_otimizador_status').value = settings.otimizador.statusUrl || '';
@@ -573,6 +585,8 @@ $('settingsSaveBtn').addEventListener('click', ()=>{
     criador: {
       triggerUrl: $('cfg_criador_trigger').value.trim(),
       statusUrl: $('cfg_criador_status').value.trim(),
+      promptsStatusUrl: $('cfg_criador_prompts_status').value.trim(),
+      uploadUrl: $('cfg_criador_upload').value.trim(),
       cancelUrl: $('cfg_criador_cancel').value.trim()
     },
     otimizador: {
@@ -608,13 +622,7 @@ $('settingsSaveBtn').addEventListener('click', ()=>{
   // aplica as novas URLs imediatamente, sem precisar recarregar a página
   busyResumeUrls.clear();
   busyCancelUids.clear();
-  stopManualPolling();
-  if(activeTab === 'otimizadorManual'){
-    restartManualPolling();
-  } else {
-    fetchStatus();
-    restartPolling();
-  }
+  refreshActiveView();
 });
 
 $('settingsResetBtn').addEventListener('click', ()=>{
@@ -632,6 +640,7 @@ $('settingsTestBtn').addEventListener('click', async ()=>{
 
   const alvos = [
     ['Criador', $('cfg_criador_status').value.trim()],
+    ['Criador (prompts)', $('cfg_criador_prompts_status').value.trim()],
     ['Otimizador', $('cfg_otimizador_status').value.trim()],
     ['Otimizador Manual', $('cfg_manual_status').value.trim()],
     ['Shopee', $('cfg_shopee_status').value.trim()]
@@ -657,6 +666,24 @@ $('settingsTestBtn').addEventListener('click', async ()=>{
 $('platformBtnMl').addEventListener('click', ()=> switchPlatform('ml'));
 $('platformBtnShopee').addEventListener('click', ()=> switchPlatform('shopee'));
 
+// Centraliza qual "view" fica ativa (lista genérica "Em andamento" e/ou
+// a área de prompts+upload manuais) de acordo com a aba/plataforma atual.
+function refreshActiveView(){
+  otimizadorManualFlow.stopPolling();
+  criadorManualFlow.stopPolling();
+  $('sharedListWrap').style.display = (activeTab === 'otimizadorManual') ? 'none' : '';
+
+  if(activeTab === 'otimizadorManual'){
+    otimizadorManualFlow.restartPolling();
+    return;
+  }
+  if(activeTab === 'criador'){
+    criadorManualFlow.restartPolling();
+  }
+  fetchStatus();
+  restartPolling();
+}
+
 function switchPlatform(platform){
   activePlatform = platform;
   $('platformBtnMl').classList.toggle('active', platform === 'ml');
@@ -666,14 +693,7 @@ function switchPlatform(platform){
   activeTab = (platform === 'ml') ? lastMlTab : 'shopee';
   busyResumeUrls.clear();
   busyCancelUids.clear();
-  $('sharedListWrap').style.display = (activeTab === 'otimizadorManual') ? 'none' : '';
-  if(activeTab === 'otimizadorManual'){
-    restartManualPolling();
-  } else {
-    stopManualPolling();
-    fetchStatus();
-    restartPolling();
-  }
+  refreshActiveView();
 }
 
 // ---------- tabs (dentro do Mercado Livre) ----------
@@ -691,14 +711,9 @@ function switchTab(tab){
 
   // A aba "Otimizador Manual" tem sua própria lista (prompts + upload) — a lista
   // genérica "Em andamento" não faz sentido pra ela, então escondemos as duas.
-  $('sharedListWrap').style.display = (tab === 'otimizadorManual') ? 'none' : '';
-
-  if(tab === 'otimizadorManual'){
-    restartManualPolling();
-  } else {
-    stopManualPolling();
-    fetchStatus();
-  }
+  // A aba "Criador" mostra as duas: a lista geral de acompanhamento e, quando
+  // houver, a área de prompts+upload das fotos do anúncio.
+  refreshActiveView();
 }
 $('tabBtnCriador').addEventListener('click', ()=> switchTab('criador'));
 $('tabBtnOtimizador').addEventListener('click', ()=> switchTab('otimizador'));
@@ -966,7 +981,7 @@ $('runOtimizadorManualBtn').addEventListener('click', async ()=>{
     statusEl.textContent = 'Otimização manual iniciada. Os prompts aparecem abaixo assim que ficarem prontos.';
     statusEl.className = 'status-line ok';
     showToast('Otimizador manual iniciado');
-    setTimeout(fetchManualStatus, 1500);
+    setTimeout(otimizadorManualFlow.fetchStatus, 1500);
   }catch(e){
     statusEl.textContent = 'Não consegui iniciar. Confere a URL do webhook e o CORS no n8n. (' + e.message + ')';
     statusEl.className = 'status-line err';
@@ -976,238 +991,273 @@ $('runOtimizadorManualBtn').addEventListener('click', async ()=>{
   }
 });
 
-// ---------- otimizador manual: prompts + upload ----------
-let manualPollTimer = null;
-let manualSelectedFiles = {}; // { etapa: File }
-let manualCurrentSku = null;
+// ---------- prompts + upload de imagens manuais (reutilizável) ----------
+// Essa mesma mecânica serve tanto pro Otimizador Manual quanto pro Criador
+// (que agora também usa geração manual de fotos): consulta um webhook de
+// status que devolve os prompts pendentes, deixa copiar cada prompt e
+// depois enviar os arquivos gerados pra um webhook de upload.
+function createManualImageFlow(opts){
+  // opts: { areaId, getStatusUrl, getUploadUrl, getCancelUrl, missingStatusMsg, missingUploadMsg, missingCancelMsg, emptyTitle, emptyMsg }
+  let pollTimer = null;
+  let selectedFiles = {}; // { etapa: File }
+  let currentSku = null;
+  let lastRenderedKey = null;
 
-function restartManualPolling(){
-  fetchManualStatus();
-  stopManualPolling();
-  manualPollTimer = setInterval(fetchManualStatus, settings.pollInterval || 10000);
-}
-function stopManualPolling(){
-  if(manualPollTimer){ clearInterval(manualPollTimer); manualPollTimer = null; }
-}
-
-async function fetchManualStatus(){
-  const area = $('manualPendingArea');
-  const statusUrl = settings.otimizadorManual.statusUrl;
-  if(!statusUrl){
-    area.innerHTML = `<div class="empty"><strong>Configura o webhook de status</strong>Edita CONFIG.otimizadorManual.statusUrl no código do arquivo.</div>`;
-    return;
+  function restartPolling(){
+    fetchStatus();
+    stopPolling();
+    pollTimer = setInterval(fetchStatus, settings.pollInterval || 10000);
   }
-  try{
-    const res = await fetch(statusUrl);
-    if(!res.ok) throw new Error('status ' + res.status);
-    const data = await res.json();
-    // O n8n devolve um ARRAY quando há vários itens pendentes, mas devolve
-    // o OBJETO sozinho (sem colchetes) quando há exatamente 1 item pendente.
-    // Também cobre o formato { items: [...] } por segurança.
-    let items;
-    if(Array.isArray(data)){
-      items = data;
-    } else if(data && Array.isArray(data.items)){
-      items = data.items;
-    } else if(data && typeof data === 'object' && Object.keys(data).length){
-      items = [data];
-    } else {
-      items = [];
+  function stopPolling(){
+    if(pollTimer){ clearInterval(pollTimer); pollTimer = null; }
+  }
+
+  async function fetchStatus(){
+    const area = $(opts.areaId);
+    const statusUrl = opts.getStatusUrl();
+    if(!statusUrl){
+      area.innerHTML = `<div class="empty"><strong>Configura o webhook de status</strong>${opts.missingStatusMsg}</div>`;
+      return;
     }
-    renderManualPending(items);
-  }catch(e){
-    area.innerHTML = `<div class="empty"><strong>Não consegui buscar os prompts</strong>Confere se o webhook de status está ativo no n8n e se o CORS está liberado.</div>`;
-  }
-}
-
-let manualLastRenderedKey = null;
-
-function renderManualPending(items){
-  const area = $('manualPendingArea');
-  const item = items && items.length ? items[0] : null;
-
-  if(!item){
-    // Só redesenha o "vazio" se não estava vazio antes — evita piscar/resetar à toa.
-    if(manualLastRenderedKey !== null){
-      area.innerHTML = `<div class="empty"><strong>Nada aguardando imagens</strong>Clique em "Rodar otimizador manual agora" pra buscar o próximo anúncio pendente.</div>`;
+    try{
+      const res = await fetch(statusUrl);
+      if(!res.ok) throw new Error('status ' + res.status);
+      const data = await res.json();
+      // O n8n devolve um ARRAY quando há vários itens pendentes, mas devolve
+      // o OBJETO sozinho (sem colchetes) quando há exatamente 1 item pendente.
+      // Também cobre o formato { items: [...] } por segurança.
+      let items;
+      if(Array.isArray(data)){
+        items = data;
+      } else if(data && Array.isArray(data.items)){
+        items = data.items;
+      } else if(data && typeof data === 'object' && Object.keys(data).length){
+        items = [data];
+      } else {
+        items = [];
+      }
+      renderPending(items);
+    }catch(e){
+      area.innerHTML = `<div class="empty"><strong>Não consegui buscar os prompts</strong>Confere se o webhook de status está ativo no n8n e se o CORS está liberado.</div>`;
     }
-    manualCurrentSku = null;
-    manualSelectedFiles = {};
-    manualLastRenderedKey = null;
-    return;
   }
 
-  // se mudou de produto (novo SKU), limpa seleção de arquivos anterior
-  if(manualCurrentSku !== item.sku){
-    manualCurrentSku = item.sku;
-    manualSelectedFiles = {};
-  }
+  function renderPending(items){
+    const area = $(opts.areaId);
+    const item = items && items.length ? items[0] : null;
 
-  const prompts = item.prompts || [];
+    if(!item){
+      // Só redesenha o "vazio" se não estava vazio antes — evita piscar/resetar à toa.
+      if(lastRenderedKey !== null){
+        area.innerHTML = `<div class="empty"><strong>${opts.emptyTitle}</strong>${opts.emptyMsg}</div>`;
+      }
+      currentSku = null;
+      selectedFiles = {};
+      lastRenderedKey = null;
+      return;
+    }
 
-  // Chave de "nada mudou de verdade": mesmo SKU, mesma quantidade de prompts, mesmo status.
-  // Se bater com a última renderização, NÃO redesenha — isso preserva os <input type=file>
-  // já preenchidos na tela (redesenhar do zero cria inputs novos e "apaga" a seleção visual).
-  const renderKey = item.sku + '::' + prompts.length + '::' + (item.status || '');
-  if(renderKey === manualLastRenderedKey){
-    return;
-  }
-  manualLastRenderedKey = renderKey;
+    // se mudou de produto (novo SKU), limpa seleção de arquivos anterior
+    if(currentSku !== item.sku){
+      currentSku = item.sku;
+      selectedFiles = {};
+    }
 
-  const refHtml = item.imagem_referencia ? `
-    <div class="manual-ref">
-      <img src="${escapeAttr(item.imagem_referencia)}" alt="Foto atual do anúncio" loading="lazy" onclick="openLightbox('${escapeAttr(item.imagem_referencia).replace(/'/g,"\\'")}')">
-      <div class="txt">
-        <strong>${escapeHtml(item.nome || 'Produto')}</strong>
-        <p>${escapeHtml(item.sku || '')} — use esta foto como referência de produto/embalagem em todos os prompts.</p>
+    const prompts = item.prompts || [];
+    const qtd = prompts.length;
+
+    // Chave de "nada mudou de verdade": mesmo SKU, mesma quantidade de prompts, mesmo status.
+    // Se bater com a última renderização, NÃO redesenha — isso preserva os <input type=file>
+    // já preenchidos na tela (redesenhar do zero cria inputs novos e "apaga" a seleção visual).
+    const renderKey = item.sku + '::' + qtd + '::' + (item.status || '');
+    if(renderKey === lastRenderedKey){
+      return;
+    }
+    lastRenderedKey = renderKey;
+
+    const refHtml = item.imagem_referencia ? `
+      <div class="manual-ref">
+        <img src="${escapeAttr(item.imagem_referencia)}" alt="Foto atual do anúncio" loading="lazy" onclick="openLightbox('${escapeAttr(item.imagem_referencia).replace(/'/g,"\\'")}')">
+        <div class="txt">
+          <strong>${escapeHtml(item.nome || 'Produto')}</strong>
+          <p>${escapeHtml(item.sku || '')} — use esta foto como referência de produto/embalagem em todos os prompts.</p>
+        </div>
+      </div>` : '';
+
+    const promptsHtml = prompts.map(p => `
+      <div class="prompt-card">
+        <div class="prompt-head">
+          <span class="prompt-title">${escapeHtml(p.etapa)}. ${escapeHtml(p.nome)}</span>
+          <button class="copy-btn" type="button" data-copy-etapa="${escapeAttr(p.etapa)}">Copiar</button>
+        </div>
+        <pre class="prompt-text">${escapeHtml(p.prompt)}</pre>
+      </div>`).join('');
+
+    const uploadHtml = prompts.map(p => `
+      <div class="upload-slot" id="${opts.areaId}_uploadSlot_${p.etapa}">
+        <label>${escapeHtml(p.etapa)}. ${escapeHtml(p.nome)}</label>
+        <input type="file" accept="image/*" data-etapa="${escapeAttr(p.etapa)}">
+      </div>`).join('');
+
+    area.innerHTML = `
+      <div class="card">
+        <h2>Prompts das ${qtd} imagens</h2>
+        ${refHtml}
+        ${promptsHtml}
+        <div class="form-actions" style="justify-content:flex-start;margin-top:4px;">
+          <button class="ghost" id="${opts.areaId}_cancelarBtn" style="color:var(--red);border-color:#f3c3cb;">✕ Cancelar este pedido</button>
+        </div>
       </div>
-    </div>` : '';
+      <div class="card">
+        <h2>Enviar as ${qtd} imagens criadas</h2>
+        <p class="sub" style="margin-bottom:12px;">Selecione o arquivo gerado pra cada etapa (pode ser em qualquer ordem) e clique em enviar.</p>
+        <div class="upload-grid">${uploadHtml}</div>
+        <div class="form-actions" style="justify-content:flex-start;">
+          <button class="primary" id="${opts.areaId}_enviarBtn">📤 Enviar imagens</button>
+        </div>
+        <div class="status-line" id="${opts.areaId}_uploadStatus"></div>
+      </div>`;
 
-  const promptsHtml = prompts.map(p => `
-    <div class="prompt-card">
-      <div class="prompt-head">
-        <span class="prompt-title">${escapeHtml(p.etapa)}. ${escapeHtml(p.nome)}</span>
-        <button class="copy-btn" type="button" data-copy-etapa="${escapeAttr(p.etapa)}">Copiar</button>
-      </div>
-      <pre class="prompt-text">${escapeHtml(p.prompt)}</pre>
-    </div>`).join('');
+    // copiar prompt individual
+    area.querySelectorAll('[data-copy-etapa]').forEach(btn => {
+      btn.addEventListener('click', ()=>{
+        const etapa = btn.getAttribute('data-copy-etapa');
+        const p = prompts.find(x => String(x.etapa) === String(etapa));
+        if(!p) return;
+        copiarTexto(p.prompt).then(ok=>{
+          if(ok){
+            btn.textContent = 'Copiado!';
+            btn.classList.add('copied');
+            setTimeout(()=>{ btn.textContent = 'Copiar'; btn.classList.remove('copied'); }, 1500);
+          } else {
+            showToast('Não consegui copiar automaticamente. Copie manualmente.');
+          }
+        });
+      });
+    });
 
-  const uploadHtml = prompts.map(p => `
-    <div class="upload-slot" id="uploadSlot_${p.etapa}">
-      <label>${escapeHtml(p.etapa)}. ${escapeHtml(p.nome)}</label>
-      <input type="file" accept="image/*" data-etapa="${escapeAttr(p.etapa)}">
-    </div>`).join('');
-
-  area.innerHTML = `
-    <div class="card">
-      <h2>Prompts das 6 imagens</h2>
-      ${refHtml}
-      ${promptsHtml}
-      <div class="form-actions" style="justify-content:flex-start;margin-top:4px;">
-        <button class="ghost" id="cancelarPedidoBtn" style="color:var(--red);border-color:#f3c3cb;">✕ Cancelar este pedido</button>
-      </div>
-    </div>
-    <div class="card">
-      <h2>Enviar as 6 imagens criadas</h2>
-      <p class="sub" style="margin-bottom:12px;">Selecione o arquivo gerado pra cada etapa (pode ser em qualquer ordem) e clique em enviar.</p>
-      <div class="upload-grid">${uploadHtml}</div>
-      <div class="form-actions" style="justify-content:flex-start;">
-        <button class="primary" id="enviarImagensBtn">📤 Enviar imagens</button>
-      </div>
-      <div class="status-line" id="manualUploadStatus"></div>
-    </div>`;
-
-  // copiar prompt individual
-  area.querySelectorAll('[data-copy-etapa]').forEach(btn => {
-    btn.addEventListener('click', ()=>{
-      const etapa = btn.getAttribute('data-copy-etapa');
-      const p = prompts.find(x => String(x.etapa) === String(etapa));
-      if(!p) return;
-      copiarTexto(p.prompt).then(ok=>{
-        if(ok){
-          btn.textContent = 'Copiado!';
-          btn.classList.add('copied');
-          setTimeout(()=>{ btn.textContent = 'Copiar'; btn.classList.remove('copied'); }, 1500);
+    // seleção de arquivos
+    area.querySelectorAll('.upload-slot input[type=file]').forEach(input => {
+      input.addEventListener('change', ()=>{
+        const etapa = input.getAttribute('data-etapa');
+        const slot = $(opts.areaId + '_uploadSlot_' + etapa);
+        if(input.files && input.files[0]){
+          selectedFiles[etapa] = input.files[0];
+          slot.classList.add('filled');
         } else {
-          showToast('Não consegui copiar automaticamente. Copie manualmente.');
+          delete selectedFiles[etapa];
+          slot.classList.remove('filled');
         }
       });
     });
-  });
 
-  // seleção de arquivos
-  area.querySelectorAll('.upload-slot input[type=file]').forEach(input => {
-    input.addEventListener('change', ()=>{
-      const etapa = input.getAttribute('data-etapa');
-      const slot = $('uploadSlot_' + etapa);
-      if(input.files && input.files[0]){
-        manualSelectedFiles[etapa] = input.files[0];
-        slot.classList.add('filled');
-      } else {
-        delete manualSelectedFiles[etapa];
-        slot.classList.remove('filled');
-      }
+    const enviarBtn = $(opts.areaId + '_enviarBtn');
+    if(enviarBtn) enviarBtn.addEventListener('click', ()=> enviarImagens(prompts, item.sku));
+
+    const cancelarBtn = $(opts.areaId + '_cancelarBtn');
+    if(cancelarBtn) cancelarBtn.addEventListener('click', ()=> cancelarPedido(item.sku, item.nome));
+  }
+
+  async function cancelarPedido(sku, nome){
+    const cancelUrl = opts.getCancelUrl();
+    if(!cancelUrl){
+      showToast(opts.missingCancelMsg);
+      return;
+    }
+    const confirmado = confirm(
+      `Cancelar o pedido de "${nome || sku}"?\n\nEsse produto ficará marcado como CANCELADO na planilha e não será selecionado automaticamente de novo.`
+    );
+    if(!confirmado) return;
+
+    const btn = $(opts.areaId + '_cancelarBtn');
+    if(btn){ btn.disabled = true; btn.textContent = 'Cancelando...'; }
+
+    try{
+      const res = await fetch(cancelUrl, {
+        method: 'POST',
+        headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify({ sku })
+      });
+      if(!res.ok) throw new Error('status ' + res.status);
+      showToast('Pedido cancelado: ' + (sku || ''));
+      lastRenderedKey = null; // força redesenhar mesmo que o próximo poll pareça "igual"
+      setTimeout(fetchStatus, 1000);
+    }catch(e){
+      showToast('Não consegui cancelar. Tenta de novo. (' + e.message + ')');
+      if(btn){ btn.disabled = false; btn.textContent = '✕ Cancelar este pedido'; }
+    }
+  }
+
+  async function enviarImagens(prompts, sku){
+    const statusEl = $(opts.areaId + '_uploadStatus');
+    const etapasEsperadas = prompts.map(p => String(p.etapa));
+    const faltando = etapasEsperadas.filter(e => !selectedFiles[e]);
+    if(faltando.length){
+      statusEl.textContent = `Falta selecionar a(s) imagem(ns) da(s) etapa(s): ${faltando.join(', ')}.`;
+      statusEl.className = 'status-line err';
+      return;
+    }
+    const uploadUrl = opts.getUploadUrl();
+    if(!uploadUrl){
+      statusEl.textContent = opts.missingUploadMsg;
+      statusEl.className = 'status-line err';
+      return;
+    }
+
+    const fd = new FormData();
+    fd.append('sku', sku || '');
+    etapasEsperadas.forEach(etapa => {
+      const file = selectedFiles[etapa];
+      fd.append('imagem_' + etapa, file, file.name);
     });
-  });
 
-  const enviarBtn = $('enviarImagensBtn');
-  if(enviarBtn) enviarBtn.addEventListener('click', ()=> enviarImagensManual(prompts, item.sku));
+    const btn = $(opts.areaId + '_enviarBtn');
+    btn.disabled = true;
+    btn.textContent = 'Enviando...';
+    statusEl.textContent = '';
 
-  const cancelarBtn = $('cancelarPedidoBtn');
-  if(cancelarBtn) cancelarBtn.addEventListener('click', ()=> cancelarPedidoManual(item.sku, item.nome));
+    try{
+      const res = await fetch(uploadUrl, { method: 'POST', body: fd });
+      if(!res.ok) throw new Error('O n8n respondeu com erro ' + res.status);
+      statusEl.textContent = 'Imagens enviadas! O anúncio será publicado em instantes.';
+      statusEl.className = 'status-line ok';
+      showToast('Imagens enviadas: ' + (sku || ''));
+      selectedFiles = {};
+      setTimeout(fetchStatus, 1500);
+    }catch(e){
+      statusEl.textContent = 'Não consegui enviar as imagens. Confere a URL do webhook e o CORS no n8n. (' + e.message + ')';
+      statusEl.className = 'status-line err';
+      btn.disabled = false;
+      btn.textContent = '📤 Enviar imagens';
+    }
+  }
+
+  return { restartPolling, stopPolling, fetchStatus };
 }
 
-async function cancelarPedidoManual(sku, nome){
-  if(!settings.otimizadorManual.cancelUrl){
-    showToast('Falta configurar CONFIG.otimizadorManual.cancelUrl.');
-    return;
-  }
-  const confirmado = confirm(
-    `Cancelar o pedido de "${nome || sku}"?\n\nEsse produto ficará marcado como CANCELADO na planilha e não será selecionado automaticamente de novo.`
-  );
-  if(!confirmado) return;
+const otimizadorManualFlow = createManualImageFlow({
+  areaId: 'manualPendingArea',
+  getStatusUrl: () => settings.otimizadorManual.statusUrl,
+  getUploadUrl: () => settings.otimizadorManual.uploadUrl,
+  getCancelUrl: () => settings.otimizadorManual.cancelUrl,
+  missingStatusMsg: 'Edita CONFIG.otimizadorManual.statusUrl no código do arquivo.',
+  missingUploadMsg: 'Falta configurar CONFIG.otimizadorManual.uploadUrl no código do arquivo.',
+  missingCancelMsg: 'Falta configurar CONFIG.otimizadorManual.cancelUrl.',
+  emptyTitle: 'Nada aguardando imagens',
+  emptyMsg: 'Clique em "Rodar otimizador manual agora" pra buscar o próximo anúncio pendente.'
+});
 
-  const btn = $('cancelarPedidoBtn');
-  if(btn){ btn.disabled = true; btn.textContent = 'Cancelando...'; }
-
-  try{
-    const res = await fetch(settings.otimizadorManual.cancelUrl, {
-      method: 'POST',
-      headers: {'Content-Type': 'application/json'},
-      body: JSON.stringify({ sku })
-    });
-    if(!res.ok) throw new Error('status ' + res.status);
-    showToast('Pedido cancelado: ' + (sku || ''));
-    manualLastRenderedKey = null; // força redesenhar mesmo que o próximo poll pareça "igual"
-    setTimeout(fetchManualStatus, 1000);
-  }catch(e){
-    showToast('Não consegui cancelar. Tenta de novo. (' + e.message + ')');
-    if(btn){ btn.disabled = false; btn.textContent = '✕ Cancelar este pedido'; }
-  }
-}
-
-async function enviarImagensManual(prompts, sku){
-  const statusEl = $('manualUploadStatus');
-  const etapasEsperadas = prompts.map(p => String(p.etapa));
-  const faltando = etapasEsperadas.filter(e => !manualSelectedFiles[e]);
-  if(faltando.length){
-    statusEl.textContent = `Falta selecionar a(s) imagem(ns) da(s) etapa(s): ${faltando.join(', ')}.`;
-    statusEl.className = 'status-line err';
-    return;
-  }
-  if(!settings.otimizadorManual.uploadUrl){
-    statusEl.textContent = 'Falta configurar CONFIG.otimizadorManual.uploadUrl no código do arquivo.';
-    statusEl.className = 'status-line err';
-    return;
-  }
-
-  const fd = new FormData();
-  fd.append('sku', sku || '');
-  etapasEsperadas.forEach(etapa => {
-    const file = manualSelectedFiles[etapa];
-    fd.append('imagem_' + etapa, file, file.name);
-  });
-
-  const btn = $('enviarImagensBtn');
-  btn.disabled = true;
-  btn.textContent = 'Enviando...';
-  statusEl.textContent = '';
-
-  try{
-    const res = await fetch(settings.otimizadorManual.uploadUrl, { method: 'POST', body: fd });
-    if(!res.ok) throw new Error('O n8n respondeu com erro ' + res.status);
-    statusEl.textContent = 'Imagens enviadas! O anúncio será publicado em instantes.';
-    statusEl.className = 'status-line ok';
-    showToast('Imagens enviadas: ' + (sku || ''));
-    manualSelectedFiles = {};
-    setTimeout(fetchManualStatus, 1500);
-  }catch(e){
-    statusEl.textContent = 'Não consegui enviar as imagens. Confere a URL do webhook e o CORS no n8n. (' + e.message + ')';
-    statusEl.className = 'status-line err';
-    btn.disabled = false;
-    btn.textContent = '📤 Enviar imagens';
-  }
-}
+const criadorManualFlow = createManualImageFlow({
+  areaId: 'criadorPendingArea',
+  getStatusUrl: () => settings.criador.promptsStatusUrl,
+  getUploadUrl: () => settings.criador.uploadUrl,
+  getCancelUrl: () => settings.criador.cancelUrl,
+  missingStatusMsg: 'Edita CONFIG.criador.promptsStatusUrl no código do arquivo.',
+  missingUploadMsg: 'Falta configurar CONFIG.criador.uploadUrl no código do arquivo.',
+  missingCancelMsg: 'Falta configurar CONFIG.criador.cancelUrl.',
+  emptyTitle: 'Nenhuma foto aguardando envio',
+  emptyMsg: 'Assim que um anúncio criado acima chegar na etapa de fotos, os prompts aparecem aqui.'
+});
 
 // ---------- status list ----------
 async function fetchStatus(){
@@ -1451,6 +1501,9 @@ function restartPolling(){
 (async function init(){
   await fetchStatus();
   restartPolling();
+  if(activeTab === 'criador'){
+    criadorManualFlow.restartPolling();
+  }
 })();
 </script>
 </body>
