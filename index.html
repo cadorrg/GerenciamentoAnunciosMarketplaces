@@ -228,6 +228,24 @@
 
   .empty.soon{border-style:dashed;}
 
+  /* faixa de conta ativa (ML) — precisa ser bem visível pra evitar confundir conta */
+  .account-banner{
+    display:flex;align-items:center;gap:10px;
+    border-radius:var(--radius);padding:12px 18px;margin-bottom:18px;
+    font-family:'Space Grotesk',sans-serif;font-weight:700;font-size:14.5px;
+    letter-spacing:.02em;border:1.5px solid transparent;
+  }
+  .account-banner .dot{
+    width:10px;height:10px;border-radius:50%;flex-shrink:0;
+  }
+  .account-banner .label{text-transform:uppercase;font-size:11px;font-weight:600;letter-spacing:.08em;opacity:.75;margin-right:2px;}
+  .account-banner.acc-cadoshop{background:#e7edfc;border-color:#b9caf5;color:#1d3f9e;}
+  .account-banner.acc-cadoshop .dot{background:var(--blue);}
+  .account-banner.acc-cadostore{background:#f3e8fd;border-color:#d8b9f5;color:#6b21a8;}
+  .account-banner.acc-cadostore .dot{background:#9333ea;}
+
+  .platform-tab.acc-cadostore.active{border-color:#9333ea;box-shadow:0 2px 10px rgba(147,51,234,.15);}
+
   /* otimizador manual */
   .manual-ref{display:flex;gap:14px;align-items:center;margin-bottom:16px;}
   .manual-ref img{width:64px;height:64px;object-fit:cover;border-radius:8px;background:var(--paper);flex-shrink:0;cursor:zoom-in;}
@@ -330,7 +348,7 @@
   </div>
 
   <div class="platform-panel active" id="platform-ml">
-    <div class="info-card" id="mlAccountBanner" style="margin-bottom:16px;"></div>
+    <div class="account-banner" id="mlAccountBanner"></div>
 
     <div class="tabs">
       <button class="tab-btn active" id="tabBtnCriador" data-tab="criador">Criador de Anúncios</button>
@@ -807,7 +825,11 @@ $('platformBtnShopee').addEventListener('click', ()=> switchPlatform('shopee'));
 function updateMlAccountBanner(){
   const banner = $('mlAccountBanner');
   if(!banner) return;
-  banner.innerHTML = `<strong>Conta ativa: ${escapeHtml(accountLabel(activeAccount))}</strong>Formulários, prompts e listas abaixo usam as URLs configuradas pra essa conta.`;
+  banner.className = 'account-banner acc-' + activeAccount;
+  banner.innerHTML = `<span class="dot"></span><span class="label">Conta ativa</span> ${escapeHtml(accountLabel(activeAccount))}`;
+  // reforça a mesma cor na aba selecionada, pra bater visualmente com a faixa
+  $('platformBtnCadoshop').classList.toggle('acc-cadoshop', true);
+  $('platformBtnCadostore').classList.toggle('acc-cadostore', true);
 }
 
 // Centraliza qual "view" fica ativa (lista genérica "Em andamento" e/ou
