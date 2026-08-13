@@ -282,30 +282,7 @@
 
     <div class="field"><label>Intervalo de atualização automática (segundos)</label><input type="text" inputmode="numeric" id="cfg_pollInterval" placeholder="10"></div>
 
-    <hr class="divider">
-    <p class="sub" style="margin:0 0 10px;font-weight:600;color:var(--ink);">Mercado Livre — Criador de Anúncios (Automático)</p>
-    <div class="field"><label>URL do gatilho (criar anúncio)</label><input type="text" id="cfg_criador_trigger" placeholder="https://.../webhook/criar_anuncio"></div>
-    <div class="field"><label>URL de status</label><input type="text" id="cfg_criador_status" placeholder="https://.../webhook/status-anuncios"></div>
-    <div class="field"><label>URL de cancelamento</label><input type="text" id="cfg_criador_cancel" placeholder="https://.../webhook/cancelar-criador"></div>
-
-    <hr class="divider">
-    <p class="sub" style="margin:0 0 10px;font-weight:600;color:var(--ink);">Mercado Livre — Criador Manual (fluxo independente)</p>
-    <div class="field"><label>URL do gatilho (criar anúncio manual)</label><input type="text" id="cfg_criadorManual_trigger" placeholder="https://.../webhook/criar_anuncio_manual"></div>
-    <div class="field"><label>URL de status (prompts pendentes)</label><input type="text" id="cfg_criadorManual_status" placeholder="https://.../webhook/status-criador-manual"></div>
-    <div class="field"><label>URL de upload das imagens</label><input type="text" id="cfg_criadorManual_upload" placeholder="https://.../webhook/upload-imagens-criador"></div>
-    <div class="field"><label>URL de cancelamento</label><input type="text" id="cfg_criadorManual_cancel" placeholder="https://.../webhook/cancelar-criador-manual"></div>
-
-    <hr class="divider">
-    <p class="sub" style="margin:0 0 10px;font-weight:600;color:var(--ink);">Mercado Livre — Otimizador Automático</p>
-    <div class="field"><label>URL do gatilho</label><input type="text" id="cfg_otimizador_trigger" placeholder="https://.../webhook/otimizar_anuncio_ml"></div>
-    <div class="field"><label>URL de status</label><input type="text" id="cfg_otimizador_status" placeholder="https://.../webhook/status-otimizador"></div>
-
-    <hr class="divider">
-    <p class="sub" style="margin:0 0 10px;font-weight:600;color:var(--ink);">Mercado Livre — Otimizador Manual</p>
-    <div class="field"><label>URL do gatilho</label><input type="text" id="cfg_manual_trigger" placeholder="https://.../webhook/otimizar_anuncio_ml_manual"></div>
-    <div class="field"><label>URL de status (prompts pendentes)</label><input type="text" id="cfg_manual_status" placeholder="https://.../webhook/status-otimizador-manual"></div>
-    <div class="field"><label>URL de upload das imagens</label><input type="text" id="cfg_manual_upload" placeholder="https://.../webhook/upload-imagens-manual"></div>
-    <div class="field"><label>URL de cancelamento</label><input type="text" id="cfg_manual_cancel" placeholder="https://.../webhook/cancelar-otimizador-manual"></div>
+    <div id="settingsAccountsContainer"></div>
 
     <hr class="divider">
     <p class="sub" style="margin:0 0 10px;font-weight:600;color:var(--ink);">Shopee</p>
@@ -323,12 +300,21 @@
   </div>
 
   <div class="platform-tabs">
-    <button class="platform-tab active" id="platformBtnMl" data-platform="ml">
+    <button class="platform-tab active" id="platformBtnCadoshop" data-platform="ml" data-account="cadoshop">
       <span class="badge-icon badge-ml">
         <svg viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path d="M12 2 2 8v2h20V8L12 2zm-8 9v9h5v-6h6v6h5v-9H4z"/></svg>
       </span>
       <span>
-        <span class="platform-name" style="display:block;">Mercado Livre</span>
+        <span class="platform-name" style="display:block;">ML CadoShop</span>
+        <span class="platform-sub">Criador &amp; Otimizador</span>
+      </span>
+    </button>
+    <button class="platform-tab" id="platformBtnCadostore" data-platform="ml" data-account="cadostore">
+      <span class="badge-icon badge-ml">
+        <svg viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path d="M12 2 2 8v2h20V8L12 2zm-8 9v9h5v-6h6v6h5v-9H4z"/></svg>
+      </span>
+      <span>
+        <span class="platform-name" style="display:block;">ML CadoStore</span>
         <span class="platform-sub">Criador &amp; Otimizador</span>
       </span>
     </button>
@@ -344,6 +330,7 @@
   </div>
 
   <div class="platform-panel active" id="platform-ml">
+    <div class="info-card" id="mlAccountBanner" style="margin-bottom:16px;"></div>
 
     <div class="tabs">
       <button class="tab-btn active" id="tabBtnCriador" data-tab="criador">Criador de Anúncios</button>
@@ -540,27 +527,49 @@
 // que ficam salvas no navegador dele (localStorage) — não precisa mexer
 // neste código pra usar com outro cliente/instância de n8n.
 // ======================================================
+const ML_ACCOUNTS = [
+  { key: 'cadoshop', label: 'ML CadoShop' },
+  { key: 'cadostore', label: 'ML CadoStore' }
+];
+const ML_FLOWS = ['criador', 'criadorManual', 'otimizador', 'otimizadorManual'];
+
+function contaVazia(){
+  return {
+    criador: { triggerUrl: '', statusUrl: '', cancelUrl: '' },
+    criadorManual: { triggerUrl: '', statusUrl: '', uploadUrl: '', cancelUrl: '' },
+    otimizador: { triggerUrl: '', statusUrl: '' },
+    otimizadorManual: { triggerUrl: '', statusUrl: '', uploadUrl: '', cancelUrl: '' }
+  };
+}
+
 const CONFIG = {
-  criador: {
-    triggerUrl: 'https://n8n.coolify.cadoshop.com.br/webhook/criar_anuncio',
-    statusUrl: 'https://n8n.coolify.cadoshop.com.br/webhook/status-anuncios',
-    cancelUrl: 'https://n8n.coolify.cadoshop.com.br/webhook/cancelar-criador'
-  },
-  criadorManual: {
-    triggerUrl: 'https://n8n.coolify.cadoshop.com.br/webhook/criar_anuncio_manual',
-    statusUrl: 'https://n8n.coolify.cadoshop.com.br/webhook/status-criador-manual',
-    uploadUrl: 'https://n8n.coolify.cadoshop.com.br/webhook/upload-imagens-criador',
-    cancelUrl: 'https://n8n.coolify.cadoshop.com.br/webhook/cancelar-criador-manual'
-  },
-  otimizador: {
-    triggerUrl: 'https://n8n.coolify.cadoshop.com.br/webhook/otimizar_anuncio_ml',
-    statusUrl: 'https://n8n.coolify.cadoshop.com.br/webhook/status-otimizador'
-  },
-  otimizadorManual: {
-    triggerUrl: 'https://n8n.coolify.cadoshop.com.br/webhook/otimizar_anuncio_ml_manual',
-    statusUrl: 'https://n8n.coolify.cadoshop.com.br/webhook/status-otimizador-manual',
-    uploadUrl: 'https://n8n.coolify.cadoshop.com.br/webhook/upload-imagens-manual',
-    cancelUrl: 'https://n8n.coolify.cadoshop.com.br/webhook/cancelar-otimizador-manual'
+  accounts: {
+    cadoshop: {
+      criador: {
+        triggerUrl: 'https://n8n.coolify.cadoshop.com.br/webhook/criar_anuncio',
+        statusUrl: 'https://n8n.coolify.cadoshop.com.br/webhook/status-anuncios',
+        cancelUrl: 'https://n8n.coolify.cadoshop.com.br/webhook/cancelar-criador'
+      },
+      criadorManual: {
+        triggerUrl: 'https://n8n.coolify.cadoshop.com.br/webhook/criar_anuncio_manual',
+        statusUrl: 'https://n8n.coolify.cadoshop.com.br/webhook/status-criador-manual',
+        uploadUrl: 'https://n8n.coolify.cadoshop.com.br/webhook/upload-imagens-criador',
+        cancelUrl: 'https://n8n.coolify.cadoshop.com.br/webhook/cancelar-criador-manual'
+      },
+      otimizador: {
+        triggerUrl: 'https://n8n.coolify.cadoshop.com.br/webhook/otimizar_anuncio_ml',
+        statusUrl: 'https://n8n.coolify.cadoshop.com.br/webhook/status-otimizador'
+      },
+      otimizadorManual: {
+        triggerUrl: 'https://n8n.coolify.cadoshop.com.br/webhook/otimizar_anuncio_ml_manual',
+        statusUrl: 'https://n8n.coolify.cadoshop.com.br/webhook/status-otimizador-manual',
+        uploadUrl: 'https://n8n.coolify.cadoshop.com.br/webhook/upload-imagens-manual',
+        cancelUrl: 'https://n8n.coolify.cadoshop.com.br/webhook/cancelar-otimizador-manual'
+      }
+    },
+    // Preencha as URLs da segunda conta (CadoStore) na aba de Configurações (⚙)
+    // depois de publicar os workflows duplicados dela no n8n.
+    cadostore: contaVazia()
   },
   shopee: {
     cadastroTriggerUrl: 'https://n8n.coolify.cadoshop.com.br/webhook/shopee_cadastrar_produto',
@@ -581,13 +590,36 @@ function loadSettings(){
     const saved = localStorage.getItem(SETTINGS_STORAGE_KEY);
     if(!saved) return { ...CONFIG };
     const parsed = JSON.parse(saved);
-    // merge raso por seção, garantindo que qualquer campo novo que eu adicione
-    // no futuro sempre tenha um valor padrão de CONFIG mesmo em configs antigas salvas
+
+    // Migração: configs salvas ANTES de existir conta múltipla tinham os
+    // campos direto na raiz (parsed.criador, parsed.otimizador...). Se for
+    // esse o caso, tratamos como pertencentes à conta "cadoshop".
+    let parsedAccounts = parsed.accounts;
+    if(!parsedAccounts && (parsed.criador || parsed.otimizador)){
+      parsedAccounts = {
+        cadoshop: {
+          criador: parsed.criador || {},
+          criadorManual: parsed.criadorManual || {},
+          otimizador: parsed.otimizador || {},
+          otimizadorManual: parsed.otimizadorManual || {}
+        }
+      };
+    }
+
+    // merge raso por conta > fluxo, garantindo que qualquer campo novo que eu
+    // adicione no futuro sempre tenha um valor padrão de CONFIG mesmo em
+    // configs antigas salvas (e cobrindo contas que ainda não existiam).
+    const accounts = {};
+    for(const {key} of ML_ACCOUNTS){
+      const defaultConta = CONFIG.accounts[key] || contaVazia();
+      const savedConta = (parsedAccounts && parsedAccounts[key]) || {};
+      accounts[key] = {};
+      for(const flow of ML_FLOWS){
+        accounts[key][flow] = { ...defaultConta[flow], ...(savedConta[flow] || {}) };
+      }
+    }
     return {
-      criador: { ...CONFIG.criador, ...(parsed.criador||{}) },
-      criadorManual: { ...CONFIG.criadorManual, ...(parsed.criadorManual||{}) },
-      otimizador: { ...CONFIG.otimizador, ...(parsed.otimizador||{}) },
-      otimizadorManual: { ...CONFIG.otimizadorManual, ...(parsed.otimizadorManual||{}) },
+      accounts,
       shopee: { ...CONFIG.shopee, ...(parsed.shopee||{}) },
       pollInterval: (typeof parsed.pollInterval === 'number') ? parsed.pollInterval : CONFIG.pollInterval
     };
@@ -597,29 +629,81 @@ function loadSettings(){
 }
 
 let settings = loadSettings();
-let activeTab = 'criador'; // 'criador' | 'otimizador' (ML) | 'shopee'
+let activeTab = 'criador'; // 'criador' | 'criadorManual' | 'otimizador' | 'otimizadorManual' (ML) | 'shopee'
 let activePlatform = 'ml';
+let activeAccount = 'cadoshop'; // 'cadoshop' | 'cadostore' — só se aplica quando activePlatform === 'ml'
 let lastMlTab = 'criador';
 let pollTimer = null;
+
+// Config do fluxo ATUAL dentro da conta ML ativa (ex.: settings.accounts.cadoshop.criador)
+function contaAtiva(){
+  return settings.accounts[activeAccount];
+}
+function accountLabel(key){
+  const found = ML_ACCOUNTS.find(a => a.key === key);
+  return found ? found.label : key;
+}
 let busyResumeUrls = new Set();
 let busyCancelUids = new Set();
 
 // ---------- configurações (⚙) ----------
+const FLOW_FIELD_DEFS = {
+  criador: [
+    {key:'triggerUrl', label:'URL do gatilho (criar anúncio)', placeholder:'https://.../webhook/criar_anuncio'},
+    {key:'statusUrl', label:'URL de status', placeholder:'https://.../webhook/status-anuncios'},
+    {key:'cancelUrl', label:'URL de cancelamento', placeholder:'https://.../webhook/cancelar-criador'}
+  ],
+  criadorManual: [
+    {key:'triggerUrl', label:'URL do gatilho (criar anúncio manual)', placeholder:'https://.../webhook/criar_anuncio_manual'},
+    {key:'statusUrl', label:'URL de status (prompts pendentes)', placeholder:'https://.../webhook/status-criador-manual'},
+    {key:'uploadUrl', label:'URL de upload das imagens', placeholder:'https://.../webhook/upload-imagens-criador'},
+    {key:'cancelUrl', label:'URL de cancelamento', placeholder:'https://.../webhook/cancelar-criador-manual'}
+  ],
+  otimizador: [
+    {key:'triggerUrl', label:'URL do gatilho', placeholder:'https://.../webhook/otimizar_anuncio_ml'},
+    {key:'statusUrl', label:'URL de status', placeholder:'https://.../webhook/status-otimizador'}
+  ],
+  otimizadorManual: [
+    {key:'triggerUrl', label:'URL do gatilho', placeholder:'https://.../webhook/otimizar_anuncio_ml_manual'},
+    {key:'statusUrl', label:'URL de status (prompts pendentes)', placeholder:'https://.../webhook/status-otimizador-manual'},
+    {key:'uploadUrl', label:'URL de upload das imagens', placeholder:'https://.../webhook/upload-imagens-manual'},
+    {key:'cancelUrl', label:'URL de cancelamento', placeholder:'https://.../webhook/cancelar-otimizador-manual'}
+  ]
+};
+const FLOW_LABELS = {
+  criador: 'Criador de Anúncios (Automático)',
+  criadorManual: 'Criador Manual (fluxo independente)',
+  otimizador: 'Otimizador Automático',
+  otimizadorManual: 'Otimizador Manual'
+};
+
+function cfgFieldId(accountKey, flow, fieldKey){
+  return `cfg_${accountKey}_${flow}_${fieldKey}`;
+}
+
+// Monta o HTML das seções de configuração de cada conta ML dinamicamente —
+// evita duplicar o bloco inteiro de campos pra cada conta nova que existir.
+function buildSettingsAccountsHtml(){
+  return ML_ACCOUNTS.map(acc => ML_FLOWS.map(flow => {
+    const fieldsHtml = FLOW_FIELD_DEFS[flow].map(f => {
+      const id = cfgFieldId(acc.key, flow, f.key);
+      return `<div class="field"><label>${escapeHtml(f.label)}</label><input type="text" id="${id}" placeholder="${escapeAttr(f.placeholder)}"></div>`;
+    }).join('');
+    return `<hr class="divider"><p class="sub" style="margin:0 0 10px;font-weight:600;color:var(--ink);">${escapeHtml(acc.label)} — ${escapeHtml(FLOW_LABELS[flow])}</p>${fieldsHtml}`;
+  }).join('')).join('');
+}
+$('settingsAccountsContainer').innerHTML = buildSettingsAccountsHtml();
+
 function fillSettingsForm(){
   $('cfg_pollInterval').value = Math.round((settings.pollInterval||0)/1000);
-  $('cfg_criador_trigger').value = settings.criador.triggerUrl || '';
-  $('cfg_criador_status').value = settings.criador.statusUrl || '';
-  $('cfg_criador_cancel').value = settings.criador.cancelUrl || '';
-  $('cfg_criadorManual_trigger').value = settings.criadorManual.triggerUrl || '';
-  $('cfg_criadorManual_status').value = settings.criadorManual.statusUrl || '';
-  $('cfg_criadorManual_upload').value = settings.criadorManual.uploadUrl || '';
-  $('cfg_criadorManual_cancel').value = settings.criadorManual.cancelUrl || '';
-  $('cfg_otimizador_trigger').value = settings.otimizador.triggerUrl || '';
-  $('cfg_otimizador_status').value = settings.otimizador.statusUrl || '';
-  $('cfg_manual_trigger').value = settings.otimizadorManual.triggerUrl || '';
-  $('cfg_manual_status').value = settings.otimizadorManual.statusUrl || '';
-  $('cfg_manual_upload').value = settings.otimizadorManual.uploadUrl || '';
-  $('cfg_manual_cancel').value = settings.otimizadorManual.cancelUrl || '';
+  for(const acc of ML_ACCOUNTS){
+    for(const flow of ML_FLOWS){
+      for(const f of FLOW_FIELD_DEFS[flow]){
+        const el = $(cfgFieldId(acc.key, flow, f.key));
+        if(el) el.value = settings.accounts[acc.key][flow][f.key] || '';
+      }
+    }
+  }
   $('cfg_shopee_cadastro').value = settings.shopee.cadastroTriggerUrl || '';
   $('cfg_shopee_criar').value = settings.shopee.criarTriggerUrl || '';
   $('cfg_shopee_otimizar').value = settings.shopee.otimizarTriggerUrl || '';
@@ -635,28 +719,20 @@ $('settingsBtn').addEventListener('click', ()=>{
 
 $('settingsSaveBtn').addEventListener('click', ()=>{
   const pollSeconds = Number($('cfg_pollInterval').value);
+  const novaAccounts = {};
+  for(const acc of ML_ACCOUNTS){
+    novaAccounts[acc.key] = {};
+    for(const flow of ML_FLOWS){
+      const flowValues = {};
+      for(const f of FLOW_FIELD_DEFS[flow]){
+        const el = $(cfgFieldId(acc.key, flow, f.key));
+        flowValues[f.key] = el ? el.value.trim() : '';
+      }
+      novaAccounts[acc.key][flow] = flowValues;
+    }
+  }
   const novaConfig = {
-    criador: {
-      triggerUrl: $('cfg_criador_trigger').value.trim(),
-      statusUrl: $('cfg_criador_status').value.trim(),
-      cancelUrl: $('cfg_criador_cancel').value.trim()
-    },
-    criadorManual: {
-      triggerUrl: $('cfg_criadorManual_trigger').value.trim(),
-      statusUrl: $('cfg_criadorManual_status').value.trim(),
-      uploadUrl: $('cfg_criadorManual_upload').value.trim(),
-      cancelUrl: $('cfg_criadorManual_cancel').value.trim()
-    },
-    otimizador: {
-      triggerUrl: $('cfg_otimizador_trigger').value.trim(),
-      statusUrl: $('cfg_otimizador_status').value.trim()
-    },
-    otimizadorManual: {
-      triggerUrl: $('cfg_manual_trigger').value.trim(),
-      statusUrl: $('cfg_manual_status').value.trim(),
-      uploadUrl: $('cfg_manual_upload').value.trim(),
-      cancelUrl: $('cfg_manual_cancel').value.trim()
-    },
+    accounts: novaAccounts,
     shopee: {
       cadastroTriggerUrl: $('cfg_shopee_cadastro').value.trim(),
       criarTriggerUrl: $('cfg_shopee_criar').value.trim(),
@@ -696,13 +772,16 @@ $('settingsTestBtn').addEventListener('click', async ()=>{
   resultEl.textContent = 'Testando...';
   resultEl.className = 'status-line';
 
-  const alvos = [
-    ['Criador', $('cfg_criador_status').value.trim()],
-    ['Criador Manual (prompts)', $('cfg_criadorManual_status').value.trim()],
-    ['Otimizador', $('cfg_otimizador_status').value.trim()],
-    ['Otimizador Manual', $('cfg_manual_status').value.trim()],
-    ['Shopee', $('cfg_shopee_status').value.trim()]
-  ];
+  const alvos = [];
+  for(const acc of ML_ACCOUNTS){
+    for(const flow of ML_FLOWS){
+      const statusField = FLOW_FIELD_DEFS[flow].find(f => f.key === 'statusUrl');
+      if(!statusField) continue;
+      const el = $(cfgFieldId(acc.key, flow, 'statusUrl'));
+      alvos.push([`${acc.label} — ${FLOW_LABELS[flow]}`, el ? el.value.trim() : '']);
+    }
+  }
+  alvos.push(['Shopee', $('cfg_shopee_status').value.trim()]);
 
   const resultados = await Promise.all(alvos.map(async ([nome, url])=>{
     if(!url) return `${nome}: sem URL`;
@@ -720,9 +799,16 @@ $('settingsTestBtn').addEventListener('click', async ()=>{
 });
 
 
-// ---------- platform tabs (marketplace) ----------
-$('platformBtnMl').addEventListener('click', ()=> switchPlatform('ml'));
+// ---------- platform tabs (marketplace / conta ML) ----------
+$('platformBtnCadoshop').addEventListener('click', ()=> switchPlatform('ml', 'cadoshop'));
+$('platformBtnCadostore').addEventListener('click', ()=> switchPlatform('ml', 'cadostore'));
 $('platformBtnShopee').addEventListener('click', ()=> switchPlatform('shopee'));
+
+function updateMlAccountBanner(){
+  const banner = $('mlAccountBanner');
+  if(!banner) return;
+  banner.innerHTML = `<strong>Conta ativa: ${escapeHtml(accountLabel(activeAccount))}</strong>Formulários, prompts e listas abaixo usam as URLs configuradas pra essa conta.`;
+}
 
 // Centraliza qual "view" fica ativa (lista genérica "Em andamento" e/ou
 // a área de prompts+upload manuais) de acordo com a aba/plataforma atual.
@@ -730,6 +816,7 @@ function refreshActiveView(){
   otimizadorManualFlow.stopPolling();
   criadorManualFlow.stopPolling();
   $('sharedListWrap').style.display = (activeTab === 'otimizadorManual' || activeTab === 'criadorManual') ? 'none' : '';
+  updateMlAccountBanner();
 
   if(activeTab === 'otimizadorManual'){
     otimizadorManualFlow.restartPolling();
@@ -745,9 +832,13 @@ function refreshActiveView(){
   restartPolling();
 }
 
-function switchPlatform(platform){
+function switchPlatform(platform, account){
   activePlatform = platform;
-  $('platformBtnMl').classList.toggle('active', platform === 'ml');
+  if(platform === 'ml' && account){
+    activeAccount = account;
+  }
+  $('platformBtnCadoshop').classList.toggle('active', platform === 'ml' && activeAccount === 'cadoshop');
+  $('platformBtnCadostore').classList.toggle('active', platform === 'ml' && activeAccount === 'cadostore');
   $('platformBtnShopee').classList.toggle('active', platform === 'shopee');
   $('platform-ml').classList.toggle('active', platform === 'ml');
   $('platform-shopee').classList.toggle('active', platform === 'shopee');
@@ -947,8 +1038,8 @@ wireCreateForm({
   prefix: 'f',
   btnId: 'submitBtn',
   statusId: 'createStatus',
-  getTriggerUrl: () => settings.criador.triggerUrl,
-  missingTriggerMsg: 'Falta configurar CONFIG.criador.triggerUrl no código do arquivo.',
+  getTriggerUrl: () => contaAtiva().criador.triggerUrl,
+  missingTriggerMsg: 'Falta configurar a URL do gatilho do Criador nas Configurações (⚙) dessa conta.',
   successMsg: 'Anúncio enviado. Acompanha o progresso na lista abaixo.',
   onSuccess: () => setTimeout(fetchStatus, 1200)
 });
@@ -957,8 +1048,8 @@ wireCreateForm({
   prefix: 'fm',
   btnId: 'submitManualBtn',
   statusId: 'createManualStatus',
-  getTriggerUrl: () => settings.criadorManual.triggerUrl,
-  missingTriggerMsg: 'Falta configurar CONFIG.criadorManual.triggerUrl no código do arquivo.',
+  getTriggerUrl: () => contaAtiva().criadorManual.triggerUrl,
+  missingTriggerMsg: 'Falta configurar a URL do gatilho do Criador Manual nas Configurações (⚙) dessa conta.',
   successMsg: 'Anúncio enviado. Quando chegar na etapa de fotos (leva alguns minutos), clique em "Buscar pedido de fotos pendente" aqui embaixo.',
   onSuccess: null
 });
@@ -1026,8 +1117,8 @@ function clearShopeeForm(){
 // ---------- run otimizador ----------
 $('runOtimizadorBtn').addEventListener('click', async ()=>{
   const statusEl = $('otimizadorStatus');
-  if(!settings.otimizador.triggerUrl){
-    statusEl.textContent = 'Falta configurar CONFIG.otimizador.triggerUrl no código do arquivo.';
+  if(!contaAtiva().otimizador.triggerUrl){
+    statusEl.textContent = 'Falta configurar a URL do gatilho do Otimizador nas Configurações (⚙) dessa conta.';
     statusEl.className = 'status-line err';
     return;
   }
@@ -1035,7 +1126,7 @@ $('runOtimizadorBtn').addEventListener('click', async ()=>{
   $('runOtimizadorBtn').textContent = 'Iniciando...';
   statusEl.textContent = '';
   try{
-    const res = await fetch(settings.otimizador.triggerUrl, { method: 'POST' });
+    const res = await fetch(contaAtiva().otimizador.triggerUrl, { method: 'POST' });
     if(!res.ok){
       throw new Error('O n8n respondeu com erro ' + res.status);
     }
@@ -1055,8 +1146,8 @@ $('runOtimizadorBtn').addEventListener('click', async ()=>{
 // ---------- run otimizador manual ----------
 $('runOtimizadorManualBtn').addEventListener('click', async ()=>{
   const statusEl = $('otimizadorManualStatus');
-  if(!settings.otimizadorManual.triggerUrl){
-    statusEl.textContent = 'Falta configurar CONFIG.otimizadorManual.triggerUrl no código do arquivo.';
+  if(!contaAtiva().otimizadorManual.triggerUrl){
+    statusEl.textContent = 'Falta configurar a URL do gatilho do Otimizador Manual nas Configurações (⚙) dessa conta.';
     statusEl.className = 'status-line err';
     return;
   }
@@ -1064,7 +1155,7 @@ $('runOtimizadorManualBtn').addEventListener('click', async ()=>{
   $('runOtimizadorManualBtn').textContent = 'Iniciando...';
   statusEl.textContent = '';
   try{
-    const res = await fetch(settings.otimizadorManual.triggerUrl, { method: 'POST' });
+    const res = await fetch(contaAtiva().otimizadorManual.triggerUrl, { method: 'POST' });
     if(!res.ok) throw new Error('O n8n respondeu com erro ' + res.status);
     statusEl.textContent = 'Otimização manual iniciada. Os prompts aparecem abaixo assim que ficarem prontos.';
     statusEl.className = 'status-line ok';
@@ -1343,24 +1434,24 @@ function createManualImageFlow(opts){
 
 const otimizadorManualFlow = createManualImageFlow({
   areaId: 'manualPendingArea',
-  getStatusUrl: () => settings.otimizadorManual.statusUrl,
-  getUploadUrl: () => settings.otimizadorManual.uploadUrl,
-  getCancelUrl: () => settings.otimizadorManual.cancelUrl,
-  missingStatusMsg: 'Edita CONFIG.otimizadorManual.statusUrl no código do arquivo.',
-  missingUploadMsg: 'Falta configurar CONFIG.otimizadorManual.uploadUrl no código do arquivo.',
-  missingCancelMsg: 'Falta configurar CONFIG.otimizadorManual.cancelUrl.',
+  getStatusUrl: () => contaAtiva().otimizadorManual.statusUrl,
+  getUploadUrl: () => contaAtiva().otimizadorManual.uploadUrl,
+  getCancelUrl: () => contaAtiva().otimizadorManual.cancelUrl,
+  missingStatusMsg: 'Edita a URL de status do Otimizador Manual nas Configurações (⚙) dessa conta.',
+  missingUploadMsg: 'Falta configurar a URL de upload do Otimizador Manual nas Configurações (⚙) dessa conta.',
+  missingCancelMsg: 'Falta configurar a URL de cancelamento do Otimizador Manual nas Configurações (⚙) dessa conta.',
   emptyTitle: 'Nada aguardando imagens',
   emptyMsg: 'Clique em "Rodar otimizador manual agora" pra buscar o próximo anúncio pendente.'
 });
 
 const criadorManualFlow = createManualImageFlow({
   areaId: 'criadorPendingArea',
-  getStatusUrl: () => settings.criadorManual.statusUrl,
-  getUploadUrl: () => settings.criadorManual.uploadUrl,
-  getCancelUrl: () => settings.criadorManual.cancelUrl,
-  missingStatusMsg: 'Edita CONFIG.criadorManual.statusUrl no código do arquivo.',
-  missingUploadMsg: 'Falta configurar CONFIG.criadorManual.uploadUrl no código do arquivo.',
-  missingCancelMsg: 'Falta configurar CONFIG.criadorManual.cancelUrl.',
+  getStatusUrl: () => contaAtiva().criadorManual.statusUrl,
+  getUploadUrl: () => contaAtiva().criadorManual.uploadUrl,
+  getCancelUrl: () => contaAtiva().criadorManual.cancelUrl,
+  missingStatusMsg: 'Edita a URL de status do Criador Manual nas Configurações (⚙) dessa conta.',
+  missingUploadMsg: 'Falta configurar a URL de upload do Criador Manual nas Configurações (⚙) dessa conta.',
+  missingCancelMsg: 'Falta configurar a URL de cancelamento do Criador Manual nas Configurações (⚙) dessa conta.',
   emptyTitle: 'Nenhuma foto aguardando envio',
   emptyMsg: 'Assim que um anúncio criado acima chegar na etapa de fotos, os prompts aparecem aqui.'
 });
@@ -1368,9 +1459,11 @@ const criadorManualFlow = createManualImageFlow({
 // ---------- status list ----------
 async function fetchStatus(){
   const listEl = $('list');
-  const statusUrl = settings[activeTab] && settings[activeTab].statusUrl;
+  const flowCfg = (activeTab === 'shopee') ? settings.shopee : contaAtiva()[activeTab];
+  const statusUrl = flowCfg && flowCfg.statusUrl;
   if(!statusUrl){
-    listEl.innerHTML = `<div class="empty"><strong>Configura o webhook de status</strong>Sem essa URL não dá pra acompanhar o andamento por aqui — edita CONFIG.${activeTab}.statusUrl no código do arquivo.</div>`;
+    const cfgHint = (activeTab === 'shopee') ? 'CONFIG.shopee.statusUrl' : `a URL de status de "${accountLabel(activeAccount)} — ${FLOW_LABELS[activeTab] || activeTab}"`;
+    listEl.innerHTML = `<div class="empty"><strong>Configura o webhook de status</strong>Sem essa URL não dá pra acompanhar o andamento por aqui — edita ${cfgHint} nas Configurações (⚙).</div>`;
     $('itemCount').textContent = '';
     return;
   }
@@ -1425,7 +1518,7 @@ function renderList(items){
 
   listEl.innerHTML = items.map((item, idx) => {
     const sku = item.sku || item.SKU || '';
-    const showCancel = activeTab === 'criador' && !!settings.criador.cancelUrl && cancelIdxPorSku[sku] === idx;
+    const showCancel = activeTab === 'criador' && !!contaAtiva().criador.cancelUrl && cancelIdxPorSku[sku] === idx;
     return itemHtml(item, showCancel);
   }).join('');
 
@@ -1550,8 +1643,8 @@ async function resolveApproval(item, aprovado){
 
 async function cancelarItemCriador(item){
   const sku = item.sku || item.SKU || '';
-  if(!settings.criador.cancelUrl){
-    showToast('Falta configurar CONFIG.criador.cancelUrl.');
+  if(!contaAtiva().criador.cancelUrl){
+    showToast('Falta configurar a URL de cancelamento do Criador nas Configurações (⚙) dessa conta.');
     return;
   }
   const confirmado = confirm(
@@ -1564,7 +1657,7 @@ async function cancelarItemCriador(item){
   if(cancelBtn){ cancelBtn.disabled = true; cancelBtn.textContent = 'Cancelando...'; }
 
   try{
-    const res = await fetch(settings.criador.cancelUrl, {
+    const res = await fetch(contaAtiva().criador.cancelUrl, {
       method: 'POST',
       headers: {'Content-Type': 'application/json'},
       body: JSON.stringify({ sku })
@@ -1606,6 +1699,7 @@ function restartPolling(){
 
 // ---------- init ----------
 (async function init(){
+  updateMlAccountBanner();
   await fetchStatus();
   restartPolling();
 })();
