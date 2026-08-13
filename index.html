@@ -304,8 +304,7 @@
 
     <hr class="divider">
     <p class="sub" style="margin:0 0 10px;font-weight:600;color:var(--ink);">Shopee</p>
-    <div class="field"><label>URL de cadastro (fila)</label><input type="text" id="cfg_shopee_cadastro" placeholder="https://.../webhook/shopee_cadastrar_produto"></div>
-    <div class="field"><label>URL de criação</label><input type="text" id="cfg_shopee_criar" placeholder="https://.../webhook/shopee_criar_anuncio"></div>
+    <div class="field"><label>URL de cadastro / criação</label><input type="text" id="cfg_shopee_cadastro" placeholder="https://.../webhook/shopee_cadastrar_produto"></div>
     <div class="field"><label>URL de otimização</label><input type="text" id="cfg_shopee_otimizar" placeholder="https://.../webhook/shopee_otimizar_anuncio"></div>
     <div class="field"><label>URL de status</label><input type="text" id="cfg_shopee_status" placeholder="https://.../webhook/status-shopee"></div>
 
@@ -342,7 +341,7 @@
       </span>
       <span>
         <span class="platform-name" style="display:block;">Shopee</span>
-        <span class="platform-sub">Em breve</span>
+        <span class="platform-sub">Criador &amp; Otimizador</span>
       </span>
     </button>
   </div>
@@ -479,7 +478,7 @@
 
   <div class="platform-panel" id="platform-shopee">
     <div class="card">
-      <h2>Cadastrar novo produto (fila de criação Shopee)</h2>
+      <h2>Novo anúncio</h2>
       <div class="grid">
         <div class="field"><label>SKU</label><input type="text" id="s_sku" placeholder="SKU-1042"></div>
         <div class="field span2"><label>Nome do produto</label><input type="text" id="s_nome" placeholder="Tênis runner pro"></div>
@@ -502,20 +501,19 @@
         <input type="file" id="s_produto" accept="image/*">
       </div>
       <div class="form-actions">
-        <button class="primary" id="cadastrarShopeeBtn">Cadastrar produto</button>
+        <button class="primary" id="cadastrarShopeeBtn">Criar anúncio</button>
+        <a class="ghost" href="https://drive.google.com/drive/folders/1iUnHryjorNYfdIogmbNYOXkNNkL5bk2i" target="_blank" rel="noopener" style="text-decoration:none;display:inline-flex;align-items:center;">🎬 Ver pasta de vídeos</a>
       </div>
       <div class="status-line" id="cadastroShopeeStatus"></div>
     </div>
 
     <div class="info-card">
-      <strong>Disparo manual</strong>
-      Criação e otimização da Shopee rodam no mesmo fluxo — use os botões abaixo pra disparar cada um. Cadastrar só coloca o produto na fila; "Criar próximo pendente" é quem efetivamente processa. Os dois alimentam a mesma lista de acompanhamento logo abaixo.
+      <strong>Otimização</strong>
+      A otimização continua rodando a partir da planilha de Precificação — clique abaixo sempre que quiser otimizar o próximo anúncio pendente. Criação e otimização alimentam a mesma lista de acompanhamento logo abaixo.
     </div>
     <div class="card">
       <div class="form-actions" style="justify-content:flex-start;gap:10px;">
-        <button class="primary" id="runShopeeCriarBtn">▶ Criar próximo pendente</button>
         <button class="primary" id="runShopeeOtimizarBtn">▶ Otimizar próximo pendente</button>
-        <a class="ghost" href="https://drive.google.com/drive/folders/1iUnHryjorNYfdIogmbNYOXkNNkL5bk2i" target="_blank" rel="noopener" style="text-decoration:none;display:inline-flex;align-items:center;">🎬 Ver pasta de vídeos</a>
       </div>
       <div class="status-line" id="shopeeStatus"></div>
     </div>
@@ -539,12 +537,6 @@
 </div>
 
 <script>
-// ======================================================
-// Estes valores são só o PADRÃO inicial (exemplo). Depois de publicado,
-// cada cliente configura as próprias URLs na aba de Configurações (⚙),
-// que ficam salvas no navegador dele (localStorage) — não precisa mexer
-// neste código pra usar com outro cliente/instância de n8n.
-// ======================================================
 const ML_ACCOUNTS = [
   { key: 'cadoshop', label: 'ML CadoShop' },
   { key: 'cadostore', label: 'ML CadoStore' }
@@ -585,19 +577,15 @@ const CONFIG = {
         cancelUrl: 'https://n8n.coolify.cadoshop.com.br/webhook/cancelar-otimizador-manual'
       }
     },
-    // Preencha as URLs da segunda conta (CadoStore) na aba de Configurações (⚙)
-    // depois de publicar os workflows duplicados dela no n8n.
     cadostore: contaVazia()
   },
   shopee: {
     cadastroTriggerUrl: 'https://n8n.coolify.cadoshop.com.br/webhook/shopee_cadastrar_produto',
-    criarTriggerUrl: 'https://n8n.coolify.cadoshop.com.br/webhook/shopee_criar_anuncio',
     otimizarTriggerUrl: 'https://n8n.coolify.cadoshop.com.br/webhook/shopee_otimizar_anuncio',
     statusUrl: 'https://n8n.coolify.cadoshop.com.br/webhook/status-shopee'
   },
-  pollInterval: 10000 // em milissegundos. Use 0 para não atualizar sozinho.
+  pollInterval: 10000
 };
-// ======================================================
 
 const SETTINGS_STORAGE_KEY = 'cadoshopDashboardConfig_v1';
 
@@ -609,9 +597,6 @@ function loadSettings(){
     if(!saved) return { ...CONFIG };
     const parsed = JSON.parse(saved);
 
-    // Migração: configs salvas ANTES de existir conta múltipla tinham os
-    // campos direto na raiz (parsed.criador, parsed.otimizador...). Se for
-    // esse o caso, tratamos como pertencentes à conta "cadoshop".
     let parsedAccounts = parsed.accounts;
     if(!parsedAccounts && (parsed.criador || parsed.otimizador)){
       parsedAccounts = {
@@ -624,9 +609,6 @@ function loadSettings(){
       };
     }
 
-    // merge raso por conta > fluxo, garantindo que qualquer campo novo que eu
-    // adicione no futuro sempre tenha um valor padrão de CONFIG mesmo em
-    // configs antigas salvas (e cobrindo contas que ainda não existiam).
     const accounts = {};
     for(const {key} of ML_ACCOUNTS){
       const defaultConta = CONFIG.accounts[key] || contaVazia();
@@ -647,13 +629,12 @@ function loadSettings(){
 }
 
 let settings = loadSettings();
-let activeTab = 'criador'; // 'criador' | 'criadorManual' | 'otimizador' | 'otimizadorManual' (ML) | 'shopee'
+let activeTab = 'criador';
 let activePlatform = 'ml';
-let activeAccount = 'cadoshop'; // 'cadoshop' | 'cadostore' — só se aplica quando activePlatform === 'ml'
+let activeAccount = 'cadoshop';
 let lastMlTab = 'criador';
 let pollTimer = null;
 
-// Config do fluxo ATUAL dentro da conta ML ativa (ex.: settings.accounts.cadoshop.criador)
 function contaAtiva(){
   return settings.accounts[activeAccount];
 }
@@ -664,7 +645,6 @@ function accountLabel(key){
 let busyResumeUrls = new Set();
 let busyCancelUids = new Set();
 
-// ---------- configurações (⚙) ----------
 const FLOW_FIELD_DEFS = {
   criador: [
     {key:'triggerUrl', label:'URL do gatilho (criar anúncio)', placeholder:'https://.../webhook/criar_anuncio'},
@@ -699,8 +679,6 @@ function cfgFieldId(accountKey, flow, fieldKey){
   return `cfg_${accountKey}_${flow}_${fieldKey}`;
 }
 
-// Monta o HTML das seções de configuração de cada conta ML dinamicamente —
-// evita duplicar o bloco inteiro de campos pra cada conta nova que existir.
 function buildSettingsAccountsHtml(){
   return ML_ACCOUNTS.map(acc => ML_FLOWS.map(flow => {
     const fieldsHtml = FLOW_FIELD_DEFS[flow].map(f => {
@@ -723,7 +701,6 @@ function fillSettingsForm(){
     }
   }
   $('cfg_shopee_cadastro').value = settings.shopee.cadastroTriggerUrl || '';
-  $('cfg_shopee_criar').value = settings.shopee.criarTriggerUrl || '';
   $('cfg_shopee_otimizar').value = settings.shopee.otimizarTriggerUrl || '';
   $('cfg_shopee_status').value = settings.shopee.statusUrl || '';
 }
@@ -753,7 +730,6 @@ $('settingsSaveBtn').addEventListener('click', ()=>{
     accounts: novaAccounts,
     shopee: {
       cadastroTriggerUrl: $('cfg_shopee_cadastro').value.trim(),
-      criarTriggerUrl: $('cfg_shopee_criar').value.trim(),
       otimizarTriggerUrl: $('cfg_shopee_otimizar').value.trim(),
       statusUrl: $('cfg_shopee_status').value.trim()
     },
@@ -771,7 +747,6 @@ $('settingsSaveBtn').addEventListener('click', ()=>{
   $('settingsPanel').classList.remove('open');
   showToast('Configurações salvas neste navegador');
 
-  // aplica as novas URLs imediatamente, sem precisar recarregar a página
   busyResumeUrls.clear();
   busyCancelUids.clear();
   refreshActiveView();
@@ -816,8 +791,6 @@ $('settingsTestBtn').addEventListener('click', async ()=>{
   resultEl.className = 'status-line ' + (algumErro ? 'err' : 'ok');
 });
 
-
-// ---------- platform tabs (marketplace / conta ML) ----------
 $('platformBtnCadoshop').addEventListener('click', ()=> switchPlatform('ml', 'cadoshop'));
 $('platformBtnCadostore').addEventListener('click', ()=> switchPlatform('ml', 'cadostore'));
 $('platformBtnShopee').addEventListener('click', ()=> switchPlatform('shopee'));
@@ -827,13 +800,10 @@ function updateMlAccountBanner(){
   if(!banner) return;
   banner.className = 'account-banner acc-' + activeAccount;
   banner.innerHTML = `<span class="dot"></span><span class="label">Conta ativa</span> ${escapeHtml(accountLabel(activeAccount))}`;
-  // reforça a mesma cor na aba selecionada, pra bater visualmente com a faixa
   $('platformBtnCadoshop').classList.toggle('acc-cadoshop', true);
   $('platformBtnCadostore').classList.toggle('acc-cadostore', true);
 }
 
-// Centraliza qual "view" fica ativa (lista genérica "Em andamento" e/ou
-// a área de prompts+upload manuais) de acordo com a aba/plataforma atual.
 function refreshActiveView(){
   otimizadorManualFlow.stopPolling();
   criadorManualFlow.stopPolling();
@@ -845,8 +815,6 @@ function refreshActiveView(){
     return;
   }
   if(activeTab === 'criadorManual'){
-    // Igual ao Otimizador Manual: assim que a aba abre, já busca e mantém
-    // atualizando sozinho (sem precisar de um botão extra pra "buscar").
     criadorManualFlow.restartPolling();
     return;
   }
@@ -870,7 +838,6 @@ function switchPlatform(platform, account){
   refreshActiveView();
 }
 
-// ---------- tabs (dentro do Mercado Livre) ----------
 function switchTab(tab){
   activeTab = tab;
   lastMlTab = tab;
@@ -885,9 +852,6 @@ function switchTab(tab){
   busyResumeUrls.clear();
   busyCancelUids.clear();
 
-  // As abas "Criador Manual" e "Otimizador Manual" têm sua própria lista
-  // (prompts + upload) — a lista genérica "Em andamento" não faz sentido
-  // pra elas, então escondemos as duas nesse caso.
   refreshActiveView();
 }
 $('tabBtnCriador').addEventListener('click', ()=> switchTab('criador'));
@@ -895,12 +859,11 @@ $('tabBtnCriadorManual').addEventListener('click', ()=> switchTab('criadorManual
 $('tabBtnOtimizador').addEventListener('click', ()=> switchTab('otimizador'));
 $('tabBtnOtimizadorManual').addEventListener('click', ()=> switchTab('otimizadorManual'));
 
-// ---------- run shopee ----------
 async function runShopee(triggerUrl, btnId, statusElId, label){
   const btn = $(btnId);
   const statusEl = $(statusElId);
   if(!triggerUrl){
-    statusEl.textContent = 'Falta configurar a URL desse gatilho no CONFIG.shopee.';
+    statusEl.textContent = 'Falta configurar a URL desse gatilho nas Configurações (⚙).';
     statusEl.className = 'status-line err';
     return;
   }
@@ -923,12 +886,9 @@ async function runShopee(triggerUrl, btnId, statusElId, label){
     btn.textContent = originalText;
   }
 }
-$('runShopeeCriarBtn').addEventListener('click', ()=>
-  runShopee(settings.shopee.criarTriggerUrl, 'runShopeeCriarBtn', 'shopeeStatus', 'Criação'));
 $('runShopeeOtimizarBtn').addEventListener('click', ()=>
   runShopee(settings.shopee.otimizarTriggerUrl, 'runShopeeOtimizarBtn', 'shopeeStatus', 'Otimização'));
 
-// ---------- toast ----------
 let toastTimer;
 function showToast(msg){
   const t = $('toast');
@@ -938,18 +898,14 @@ function showToast(msg){
   toastTimer = setTimeout(()=> t.classList.remove('show'), 3200);
 }
 
-// ---------- copiar texto (com fallback pra contexto não-seguro / sem HTTPS) ----------
 async function copiarTexto(texto){
-  // Método moderno: só funciona em contexto seguro (https:// ou localhost).
   if(navigator.clipboard && window.isSecureContext){
     try{
       await navigator.clipboard.writeText(texto);
       return true;
     }catch(e){
-      // cai pro fallback abaixo
     }
   }
-  // Fallback: funciona em http:// e file:// também (API antiga, mas ampla compatibilidade).
   try{
     const textarea = document.createElement('textarea');
     textarea.value = texto;
@@ -969,16 +925,13 @@ async function copiarTexto(texto){
   }
 }
 
-// ---------- create ad ----------
 function parseMoney(v){
   if(!v) return null;
   const n = Number(String(v).replace(/\./g,'').replace(',','.'));
   return isNaN(n) ? v : n;
 }
 
-// ---------- criar anúncio (form genérico, reaproveitado pelo Automático e pelo Manual) ----------
 function wireCreateForm(opts){
-  // opts: {prefix, btnId, statusId, getTriggerUrl, missingTriggerMsg, successMsg, onSuccess}
   $(opts.btnId).addEventListener('click', async ()=>{
     const statusEl = $(opts.statusId);
     const triggerUrl = opts.getTriggerUrl();
@@ -1008,13 +961,13 @@ function wireCreateForm(opts){
     fd.append('SKU', sku);
     fd.append('Nome Produto', nome);
     fd.append('Marca', $(p + '_marca').value.trim());
-    fd.append('Modelo', $(p + '_modelo').value.trim());
-    fd.append('Cor', $(p + '_cor').value.trim());
-    fd.append('Gênero', $(p + '_genero').value.trim());
-    fd.append('EAN', $(p + '_ean').value.trim());
+    fd.append('Modelo', $(p + '_modelo') ? $(p + '_modelo').value.trim() : '');
+    fd.append('Cor', $(p + '_cor') ? $(p + '_cor').value.trim() : '');
+    fd.append('Gênero', $(p + '_genero') ? $(p + '_genero').value.trim() : '');
+    fd.append('EAN', $(p + '_ean') ? $(p + '_ean').value.trim() : '');
     fd.append('Custo', parseMoney($(p + '_custo').value) ?? '');
-    fd.append('Preço Venda', parseMoney($(p + '_preco').value) ?? '');
-    fd.append('Tem Variação?', $(p + '_variacao').value);
+    fd.append('Preço Venda', $(p + '_preco') ? (parseMoney($(p + '_preco').value) ?? '') : '');
+    fd.append('Tem Variação?', $(p + '_variacao') ? $(p + '_variacao').value : '');
     fd.append('frente', frenteFile, frenteFile.name);
     fd.append('verso', versoFile, versoFile.name);
     fd.append('produto', produtoFile, produtoFile.name);
@@ -1026,8 +979,6 @@ function wireCreateForm(opts){
     statusEl.textContent = '';
 
     try{
-      // Não define Content-Type manualmente: o navegador monta o boundary
-      // correto do multipart/form-data sozinho quando o body é um FormData.
       const res = await fetch(triggerUrl, { method: 'POST', body: fd });
       if(!res.ok){
         throw new Error('O n8n respondeu com erro ' + res.status);
@@ -1048,12 +999,12 @@ function wireCreateForm(opts){
 }
 
 function clearCreateForm(p){
-  [p+'_sku', p+'_nome', p+'_marca', p+'_modelo', p+'_cor', p+'_genero', p+'_ean', p+'_custo', p+'_preco']
-    .forEach(id => $(id).value = '');
-  $(p + '_frente').value = '';
-  $(p + '_verso').value = '';
-  $(p + '_produto').value = '';
-  $(p + '_variacao').value = 'Não';
+  [p+'_sku', p+'_nome', p+'_marca'].forEach(id => { if($(id)) $(id).value = ''; });
+  [p+'_modelo', p+'_cor', p+'_genero', p+'_ean', p+'_custo', p+'_preco'].forEach(id => { if($(id)) $(id).value = ''; });
+  if($(p + '_frente')) $(p + '_frente').value = '';
+  if($(p + '_verso')) $(p + '_verso').value = '';
+  if($(p + '_produto')) $(p + '_produto').value = '';
+  if($(p + '_variacao')) $(p + '_variacao').value = 'Não';
 }
 
 wireCreateForm({
@@ -1076,67 +1027,16 @@ wireCreateForm({
   onSuccess: null
 });
 
-// ---------- cadastro shopee ----------
-$('cadastrarShopeeBtn').addEventListener('click', async ()=>{
-  const statusEl = $('cadastroShopeeStatus');
-  if(!settings.shopee.cadastroTriggerUrl){
-    statusEl.textContent = 'Falta configurar CONFIG.shopee.cadastroTriggerUrl no código do arquivo.';
-    statusEl.className = 'status-line err';
-    return;
-  }
-  const sku = $('s_sku').value.trim();
-  const nome = $('s_nome').value.trim();
-  const frenteFile = $('s_frente').files[0];
-  const versoFile = $('s_verso').files[0];
-  const produtoFile = $('s_produto').files[0];
-  if(!sku || !nome){
-    statusEl.textContent = 'Preenche pelo menos SKU e Nome do produto.';
-    statusEl.className = 'status-line err';
-    return;
-  }
-  if(!frenteFile || !versoFile || !produtoFile){
-    statusEl.textContent = 'Seleciona as três fotos (frente, verso e produto) antes de enviar.';
-    statusEl.className = 'status-line err';
-    return;
-  }
-
-  const fd = new FormData();
-  fd.append('SKU', sku);
-  fd.append('Nome Produto', nome);
-  fd.append('Marca', $('s_marca').value.trim());
-  fd.append('Custo', parseMoney($('s_custo').value) ?? '');
-  fd.append('frente', frenteFile, frenteFile.name);
-  fd.append('verso', versoFile, versoFile.name);
-  fd.append('produto', produtoFile, produtoFile.name);
-
-  $('cadastrarShopeeBtn').disabled = true;
-  $('cadastrarShopeeBtn').textContent = 'Enviando...';
-  statusEl.textContent = '';
-
-  try{
-    const res = await fetch(settings.shopee.cadastroTriggerUrl, { method: 'POST', body: fd });
-    if(!res.ok) throw new Error('O n8n respondeu com erro ' + res.status);
-    statusEl.textContent = 'Produto cadastrado na fila. Clique em "Criar próximo pendente" quando quiser processar.';
-    statusEl.className = 'status-line ok';
-    showToast('Produto cadastrado: ' + sku);
-    clearShopeeForm();
-  }catch(e){
-    statusEl.textContent = 'Não consegui enviar. Confere a URL do webhook e o CORS no n8n. (' + e.message + ')';
-    statusEl.className = 'status-line err';
-  }finally{
-    $('cadastrarShopeeBtn').disabled = false;
-    $('cadastrarShopeeBtn').textContent = 'Cadastrar produto';
-  }
+wireCreateForm({
+  prefix: 's',
+  btnId: 'cadastrarShopeeBtn',
+  statusId: 'cadastroShopeeStatus',
+  getTriggerUrl: () => settings.shopee.cadastroTriggerUrl,
+  missingTriggerMsg: 'Falta configurar a URL de cadastro/criação da Shopee nas Configurações (⚙).',
+  successMsg: 'Anúncio enviado. Acompanha o progresso na lista abaixo.',
+  onSuccess: () => setTimeout(fetchStatus, 1200)
 });
 
-function clearShopeeForm(){
-  ['s_sku','s_nome','s_marca','s_custo'].forEach(id => $(id).value = '');
-  $('s_frente').value = '';
-  $('s_verso').value = '';
-  $('s_produto').value = '';
-}
-
-// ---------- run otimizador ----------
 $('runOtimizadorBtn').addEventListener('click', async ()=>{
   const statusEl = $('otimizadorStatus');
   if(!contaAtiva().otimizador.triggerUrl){
@@ -1165,7 +1065,6 @@ $('runOtimizadorBtn').addEventListener('click', async ()=>{
   }
 });
 
-// ---------- run otimizador manual ----------
 $('runOtimizadorManualBtn').addEventListener('click', async ()=>{
   const statusEl = $('otimizadorManualStatus');
   if(!contaAtiva().otimizadorManual.triggerUrl){
@@ -1192,20 +1091,10 @@ $('runOtimizadorManualBtn').addEventListener('click', async ()=>{
   }
 });
 
-// ---------- prompts + upload de imagens manuais (reutilizável) ----------
-// Essa mesma mecânica serve tanto pro Otimizador Manual quanto pro Criador
-// (que agora também usa geração manual de fotos): consulta um webhook de
-// status que devolve os prompts pendentes, deixa copiar cada prompt e
-// depois enviar os arquivos gerados pra um webhook de upload.
 function createManualImageFlow(opts){
-  // opts: { areaId, getStatusUrl, getUploadUrl, getCancelUrl, missingStatusMsg, missingUploadMsg, missingCancelMsg, emptyTitle, emptyMsg }
   let pollTimer = null;
-  let selectedFiles = {}; // { etapa: File }
+  let selectedFiles = {};
   let currentSku = null;
-  // '__unset__' = ainda não fizemos nenhuma busca nessa área (estado inicial).
-  // Isso é DIFERENTE de já ter buscado e não ter achado nada pendente — se
-  // usássemos null pros dois casos, o primeiro resultado vazio nunca
-  // sobrescreveria o placeholder inicial da tela.
   let lastRenderedKey = '__unset__';
 
   async function restartPolling(){
@@ -1226,15 +1115,9 @@ function createManualImageFlow(opts){
       return false;
     }
     try{
-      // cache:'no-store' evita que o navegador use ETag/If-None-Match nessas
-      // chamadas — com polling repetido, isso podia gerar 304 Not Modified,
-      // que o fetch() trata como "não ok" em requisições cross-origin.
       const res = await fetch(statusUrl, { cache: 'no-store' });
       if(!res.ok) throw new Error('status ' + res.status);
       const data = await res.json();
-      // O n8n devolve um ARRAY quando há vários itens pendentes, mas devolve
-      // o OBJETO sozinho (sem colchetes) quando há exatamente 1 item pendente.
-      // Também cobre o formato { items: [...] } por segurança.
       let items;
       if(Array.isArray(data)){
         items = data;
@@ -1258,10 +1141,6 @@ function createManualImageFlow(opts){
     const item = items && items.length ? items[0] : null;
 
     if(!item){
-      // Só redesenha o "vazio" se a tela não estava mostrando "vazio" antes
-      // (evita piscar/resetar à toa a cada poll) — mas SEMPRE redesenha na
-      // primeira busca (lastRenderedKey ainda '__unset__'), senão o placeholder
-      // inicial da tela nunca seria substituído quando não há nada pendente.
       if(lastRenderedKey !== 'empty'){
         area.innerHTML = `<div class="empty"><strong>${opts.emptyTitle}</strong>${opts.emptyMsg}</div>`;
       }
@@ -1271,7 +1150,6 @@ function createManualImageFlow(opts){
       return;
     }
 
-    // se mudou de produto (novo SKU), limpa seleção de arquivos anterior
     if(currentSku !== item.sku){
       currentSku = item.sku;
       selectedFiles = {};
@@ -1280,9 +1158,6 @@ function createManualImageFlow(opts){
     const prompts = item.prompts || [];
     const qtd = prompts.length;
 
-    // Chave de "nada mudou de verdade": mesmo SKU, mesma quantidade de prompts, mesmo status.
-    // Se bater com a última renderização, NÃO redesenha — isso preserva os <input type=file>
-    // já preenchidos na tela (redesenhar do zero cria inputs novos e "apaga" a seleção visual).
     const renderKey = item.sku + '::' + qtd + '::' + (item.status || '');
     if(renderKey === lastRenderedKey){
       return;
@@ -1332,7 +1207,6 @@ function createManualImageFlow(opts){
         <div class="status-line" id="${opts.areaId}_uploadStatus"></div>
       </div>`;
 
-    // copiar prompt individual
     area.querySelectorAll('[data-copy-etapa]').forEach(btn => {
       btn.addEventListener('click', ()=>{
         const etapa = btn.getAttribute('data-copy-etapa');
@@ -1350,7 +1224,6 @@ function createManualImageFlow(opts){
       });
     });
 
-    // seleção de arquivos
     area.querySelectorAll('.upload-slot input[type=file]').forEach(input => {
       input.addEventListener('change', ()=>{
         const etapa = input.getAttribute('data-etapa');
@@ -1394,7 +1267,7 @@ function createManualImageFlow(opts){
       });
       if(!res.ok) throw new Error('status ' + res.status);
       showToast('Pedido cancelado: ' + (sku || ''));
-      lastRenderedKey = null; // força redesenhar mesmo que o próximo poll pareça "igual"
+      lastRenderedKey = null;
       setTimeout(fetchStatus, 1000);
     }catch(e){
       showToast('Não consegui cancelar. Tenta de novo. (' + e.message + ')');
@@ -1431,10 +1304,6 @@ function createManualImageFlow(opts){
     statusEl.textContent = '';
 
     try{
-      // O SKU vai também na URL (query string), não só no corpo multipart.
-      // Em várias versões do n8n, quando o corpo mistura texto + vários
-      // arquivos binários, o campo de texto às vezes não chega em
-      // $json.body de forma confiável — só os arquivos. Pela URL nunca falha.
       const urlComSku = uploadUrl + (uploadUrl.includes('?') ? '&' : '?') + 'sku=' + encodeURIComponent(sku || '');
       const res = await fetch(urlComSku, { method: 'POST', body: fd });
       if(!res.ok) throw new Error('O n8n respondeu com erro ' + res.status);
@@ -1478,7 +1347,6 @@ const criadorManualFlow = createManualImageFlow({
   emptyMsg: 'Assim que um anúncio criado acima chegar na etapa de fotos, os prompts aparecem aqui.'
 });
 
-// ---------- status list ----------
 async function fetchStatus(){
   const listEl = $('list');
   const flowCfg = (activeTab === 'shopee') ? settings.shopee : contaAtiva()[activeTab];
@@ -1490,7 +1358,6 @@ async function fetchStatus(){
     return;
   }
   try{
-    // cache:'no-store' evita 304 Not Modified virando "erro" em fetch cross-origin.
     const res = await fetch(statusUrl, { cache: 'no-store' });
     if(!res.ok) throw new Error('status ' + res.status);
     const data = await res.json();
@@ -1506,15 +1373,12 @@ function renderList(items){
   const listEl = $('list');
   $('itemCount').textContent = items.length ? items.length + (items.length===1 ? ' anúncio' : ' anúncios') : '';
 
-  // Limpa da lista de "ocupados" qualquer item que já não esteja mais aguardando aprovação
   const uidsAguardando = new Set(
     items.filter(i => (i.status||'').toLowerCase() === 'aguardando').map(itemUid)
   );
   for(const uid of Array.from(busyResumeUrls)){
     if(!uidsAguardando.has(uid)) busyResumeUrls.delete(uid);
   }
-  // idem pra lista de cancelamentos "em andamento" — se o item sumiu da lista
-  // (foi cancelado com sucesso, ou concluiu antes), libera o registro de "ocupado"
   const skusPresentes = new Set(items.map(i => i.sku || i.SKU || ''));
   for(const sku of Array.from(busyCancelUids)){
     if(!skusPresentes.has(sku)) busyCancelUids.delete(sku);
@@ -1525,9 +1389,6 @@ function renderList(items){
     return;
   }
 
-  // O mesmo SKU pode aparecer em várias linhas (uma por etapa: início, imagem 1, imagem 2...).
-  // O botão de cancelar deve aparecer só numa delas — prioriza a que estiver "aguardando"
-  // aprovação (é a mais visível), senão a primeira linha não concluída daquele SKU.
   const cancelIdxPorSku = {};
   items.forEach((it, idx) => {
     const sku = it.sku || it.SKU || '';
@@ -1653,11 +1514,9 @@ async function resolveApproval(item, aprovado){
     });
     if(!res.ok) throw new Error('status ' + res.status);
     showToast(aprovado ? 'Imagem aprovada.' : 'Imagem reprovada, gerando outra.');
-    // Sucesso: mantém o botão travado. Só sai da lista de "ocupados"
-    // quando essa etapa realmente sumir do status (deixar de ser 'aguardando').
   }catch(e){
     showToast('Não consegui enviar a decisão. Tenta de novo.');
-    busyResumeUrls.delete(uid); // erro: libera pra tentar de novo
+    busyResumeUrls.delete(uid);
   }finally{
     setTimeout(fetchStatus, 800);
   }
@@ -1694,7 +1553,6 @@ async function cancelarItemCriador(item){
   }
 }
 
-// ---------- lightbox ----------
 function openLightbox(url){
   $('lightboxImg').src = url;
   $('lightbox').classList.add('show');
@@ -1711,7 +1569,6 @@ document.addEventListener('keydown', (e)=>{
   if(e.key === 'Escape') closeLightbox();
 });
 
-// ---------- polling ----------
 function restartPolling(){
   if(pollTimer) clearInterval(pollTimer);
   if(settings.pollInterval && settings.pollInterval > 0){
@@ -1719,7 +1576,6 @@ function restartPolling(){
   }
 }
 
-// ---------- init ----------
 (async function init(){
   updateMlAccountBanner();
   await fetchStatus();
