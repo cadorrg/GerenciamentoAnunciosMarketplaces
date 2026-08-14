@@ -310,6 +310,7 @@
     <div class="field"><label>URL de cadastro/criação (Manual)</label><input type="text" id="cfg_shopee_criador_manual_trigger" placeholder="https://.../webhook/shopee_cadastrar_produto_manual"></div>
     <div class="field"><label>URL de status (Manual, prompts pendentes)</label><input type="text" id="cfg_shopee_criador_manual_status" placeholder="https://.../webhook/status-criador-manual-shopee"></div>
     <div class="field"><label>URL de upload das imagens (Manual)</label><input type="text" id="cfg_shopee_criador_manual_upload" placeholder="https://.../webhook/upload-imagens-shopee"></div>
+    <div class="field"><label>URL de otimização (Manual)</label><input type="text" id="cfg_shopee_otimizar_manual" placeholder="https://.../webhook/shopee_otimizar_anuncio_manual"></div>
 
     <div class="status-line" id="settingsTestResult"></div>
     <div class="settings-actions">
@@ -539,7 +540,18 @@
 
     <div class="tab-panel" id="panel-shopee-criador-manual">
       <div class="info-card">
-        <strong>Como funciona</strong>
+        <strong>Otimizar um anúncio existente (manual)</strong>
+        Clica no botão abaixo pra pegar o próximo anúncio pendente da planilha de Precificação — sem precisar preencher formulário nenhum. Quando os prompts das imagens ficarem prontos, aparecem na mesma lista lá embaixo.
+      </div>
+      <div class="card">
+        <div class="form-actions" style="justify-content:flex-start;">
+          <button class="primary" id="runShopeeOtimizarManualBtn">▶ Otimizar próximo pendente (manual)</button>
+        </div>
+        <div class="status-line" id="shopeeOtimizarManualStatus"></div>
+      </div>
+
+      <div class="info-card">
+        <strong>Ou criar um anúncio novo (manual)</strong>
         Preenche o formulário e clica em criar. Categoria, título, descrição e atributos são processados igual ao automático; só as fotos são diferentes: quando os 6 prompts ficarem prontos (leva alguns minutos), copia cada um, gera as imagens na ferramenta de IA que preferir e envia os 6 arquivos aqui mesmo.
       </div>
       <div class="card">
@@ -650,7 +662,8 @@ const CONFIG = {
     statusUrl: 'https://n8n.coolify.cadoshop.com.br/webhook/status-shopee',
     criadorManualTriggerUrl: 'https://n8n.coolify.cadoshop.com.br/webhook/shopee_cadastrar_produto_manual',
     criadorManualStatusUrl: 'https://n8n.coolify.cadoshop.com.br/webhook/status-criador-manual-shopee',
-    criadorManualUploadUrl: 'https://n8n.coolify.cadoshop.com.br/webhook/upload-imagens-shopee'
+    criadorManualUploadUrl: 'https://n8n.coolify.cadoshop.com.br/webhook/upload-imagens-shopee',
+    otimizarManualTriggerUrl: 'https://n8n.coolify.cadoshop.com.br/webhook/shopee_otimizar_anuncio_manual'
   },
   pollInterval: 10000
 };
@@ -774,6 +787,7 @@ function fillSettingsForm(){
   $('cfg_shopee_criador_manual_trigger').value = settings.shopee.criadorManualTriggerUrl || '';
   $('cfg_shopee_criador_manual_status').value = settings.shopee.criadorManualStatusUrl || '';
   $('cfg_shopee_criador_manual_upload').value = settings.shopee.criadorManualUploadUrl || '';
+  $('cfg_shopee_otimizar_manual').value = settings.shopee.otimizarManualTriggerUrl || '';
 }
 
 $('settingsBtn').addEventListener('click', ()=>{
@@ -805,7 +819,8 @@ $('settingsSaveBtn').addEventListener('click', ()=>{
       statusUrl: $('cfg_shopee_status').value.trim(),
       criadorManualTriggerUrl: $('cfg_shopee_criador_manual_trigger').value.trim(),
       criadorManualStatusUrl: $('cfg_shopee_criador_manual_status').value.trim(),
-      criadorManualUploadUrl: $('cfg_shopee_criador_manual_upload').value.trim()
+      criadorManualUploadUrl: $('cfg_shopee_criador_manual_upload').value.trim(),
+      otimizarManualTriggerUrl: $('cfg_shopee_otimizar_manual').value.trim()
     },
     pollInterval: (isNaN(pollSeconds) || pollSeconds <= 0) ? 0 : pollSeconds * 1000
   };
@@ -982,6 +997,34 @@ async function runShopee(triggerUrl, btnId, statusElId, label){
 }
 $('runShopeeOtimizarBtn').addEventListener('click', ()=>
   runShopee(settings.shopee.otimizarTriggerUrl, 'runShopeeOtimizarBtn', 'shopeeStatus', 'Otimização'));
+
+$('runShopeeOtimizarManualBtn').addEventListener('click', async ()=>{
+  const statusEl = $('shopeeOtimizarManualStatus');
+  if(!settings.shopee.otimizarManualTriggerUrl){
+    statusEl.textContent = 'Falta configurar a URL de otimização (Manual) nas Configurações (⚙).';
+    statusEl.className = 'status-line err';
+    return;
+  }
+  const btn = $('runShopeeOtimizarManualBtn');
+  const originalText = btn.textContent;
+  btn.disabled = true;
+  btn.textContent = 'Iniciando...';
+  statusEl.textContent = '';
+  try{
+    const res = await fetch(settings.shopee.otimizarManualTriggerUrl, { method: 'POST' });
+    if(!res.ok) throw new Error('O n8n respondeu com erro ' + res.status);
+    statusEl.textContent = 'Otimização manual iniciada. Os prompts aparecem na lista abaixo assim que ficarem prontos.';
+    statusEl.className = 'status-line ok';
+    showToast('Otimizador manual (Shopee) iniciado');
+    setTimeout(shopeeCriadorManualFlow.fetchStatus, 1500);
+  }catch(e){
+    statusEl.textContent = 'Não consegui iniciar. Confere a URL do webhook e o CORS no n8n. (' + e.message + ')';
+    statusEl.className = 'status-line err';
+  }finally{
+    btn.disabled = false;
+    btn.textContent = originalText;
+  }
+});
 
 let toastTimer;
 function showToast(msg){
