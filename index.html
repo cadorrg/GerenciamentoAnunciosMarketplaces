@@ -307,6 +307,9 @@
     <div class="field"><label>URL de cadastro / criação</label><input type="text" id="cfg_shopee_cadastro" placeholder="https://.../webhook/shopee_cadastrar_produto"></div>
     <div class="field"><label>URL de otimização</label><input type="text" id="cfg_shopee_otimizar" placeholder="https://.../webhook/shopee_otimizar_anuncio"></div>
     <div class="field"><label>URL de status</label><input type="text" id="cfg_shopee_status" placeholder="https://.../webhook/status-shopee"></div>
+    <div class="field"><label>URL de cadastro/criação (Manual)</label><input type="text" id="cfg_shopee_criador_manual_trigger" placeholder="https://.../webhook/shopee_cadastrar_produto_manual"></div>
+    <div class="field"><label>URL de status (Manual, prompts pendentes)</label><input type="text" id="cfg_shopee_criador_manual_status" placeholder="https://.../webhook/status-criador-manual-shopee"></div>
+    <div class="field"><label>URL de upload das imagens (Manual)</label><input type="text" id="cfg_shopee_criador_manual_upload" placeholder="https://.../webhook/upload-imagens-shopee"></div>
 
     <div class="status-line" id="settingsTestResult"></div>
     <div class="settings-actions">
@@ -477,54 +480,107 @@
   </div>
 
   <div class="platform-panel" id="platform-shopee">
-    <div class="card">
-      <h2>Novo anúncio</h2>
-      <div class="grid">
-        <div class="field"><label>SKU</label><input type="text" id="s_sku" placeholder="SKU-1042"></div>
-        <div class="field span2"><label>Nome do produto</label><input type="text" id="s_nome" placeholder="Tênis runner pro"></div>
-        <div class="field"><label>Marca</label><input type="text" id="s_marca" placeholder="Nike"></div>
-        <div class="field"><label>Custo (R$)</label><input type="text" inputmode="decimal" id="s_custo" placeholder="120,00"></div>
-        <div class="field"><label>Preço de venda (R$)</label><input type="text" inputmode="decimal" id="s_preco" placeholder="249,90"></div>
-        <div class="field"><label>Estoque (unidades)</label><input type="text" inputmode="numeric" id="s_estoque" placeholder="10"></div>
-      </div>
-      <hr class="divider">
-      <div class="grid">
-        <div class="field"><label>Peso (kg)</label><input type="text" inputmode="decimal" id="s_peso" placeholder="0,3"></div>
-        <div class="field"><label>Altura (cm)</label><input type="text" inputmode="decimal" id="s_altura" placeholder="10"></div>
-        <div class="field"><label>Comprimento (cm)</label><input type="text" inputmode="decimal" id="s_comprimento" placeholder="15"></div>
-        <div class="field"><label>Largura (cm)</label><input type="text" inputmode="decimal" id="s_largura" placeholder="10"></div>
-      </div>
-      <hr class="divider">
-      <div class="grid">
-        <div class="field span2">
-          <label>Imagem frente (arquivo)</label>
-          <input type="file" id="s_frente" accept="image/*">
-        </div>
-        <div class="field span2">
-          <label>Imagem verso (arquivo)</label>
-          <input type="file" id="s_verso" accept="image/*">
-        </div>
-      </div>
-      <div class="field" style="margin-top:12px;">
-        <label>Foto do produto (visão geral, arquivo)</label>
-        <input type="file" id="s_produto" accept="image/*">
-      </div>
-      <div class="form-actions">
-        <button class="primary" id="cadastrarShopeeBtn">Criar anúncio</button>
-        <a class="ghost" href="https://drive.google.com/drive/folders/1iUnHryjorNYfdIogmbNYOXkNNkL5bk2i" target="_blank" rel="noopener" style="text-decoration:none;display:inline-flex;align-items:center;">🎬 Ver pasta de vídeos</a>
-      </div>
-      <div class="status-line" id="cadastroShopeeStatus"></div>
+    <div class="tabs">
+      <button class="tab-btn active" id="tabBtnShopeeCriador" data-tab="criador">Criador de Anúncios</button>
+      <button class="tab-btn" id="tabBtnShopeeCriadorManual" data-tab="criadorManual">Criador Manual</button>
     </div>
 
-    <div class="info-card">
-      <strong>Otimização</strong>
-      A otimização continua rodando a partir da planilha de Precificação — clique abaixo sempre que quiser otimizar o próximo anúncio pendente. Criação e otimização alimentam a mesma lista de acompanhamento logo abaixo.
-    </div>
-    <div class="card">
-      <div class="form-actions" style="justify-content:flex-start;gap:10px;">
-        <button class="primary" id="runShopeeOtimizarBtn">▶ Otimizar próximo pendente</button>
+    <div class="tab-panel active" id="panel-shopee-criador">
+      <div class="card">
+        <h2>Novo anúncio</h2>
+        <div class="grid">
+          <div class="field"><label>SKU</label><input type="text" id="s_sku" placeholder="SKU-1042"></div>
+          <div class="field span2"><label>Nome do produto</label><input type="text" id="s_nome" placeholder="Tênis runner pro"></div>
+          <div class="field"><label>Marca</label><input type="text" id="s_marca" placeholder="Nike"></div>
+          <div class="field"><label>Custo (R$)</label><input type="text" inputmode="decimal" id="s_custo" placeholder="120,00"></div>
+          <div class="field"><label>Preço de venda (R$)</label><input type="text" inputmode="decimal" id="s_preco" placeholder="249,90"></div>
+          <div class="field"><label>Estoque (unidades)</label><input type="text" inputmode="numeric" id="s_estoque" placeholder="10"></div>
+        </div>
+        <hr class="divider">
+        <div class="grid">
+          <div class="field"><label>Peso (kg)</label><input type="text" inputmode="decimal" id="s_peso" placeholder="0,3"></div>
+          <div class="field"><label>Altura (cm)</label><input type="text" inputmode="decimal" id="s_altura" placeholder="10"></div>
+          <div class="field"><label>Comprimento (cm)</label><input type="text" inputmode="decimal" id="s_comprimento" placeholder="15"></div>
+          <div class="field"><label>Largura (cm)</label><input type="text" inputmode="decimal" id="s_largura" placeholder="10"></div>
+        </div>
+        <hr class="divider">
+        <div class="grid">
+          <div class="field span2">
+            <label>Imagem frente (arquivo)</label>
+            <input type="file" id="s_frente" accept="image/*">
+          </div>
+          <div class="field span2">
+            <label>Imagem verso (arquivo)</label>
+            <input type="file" id="s_verso" accept="image/*">
+          </div>
+        </div>
+        <div class="field" style="margin-top:12px;">
+          <label>Foto do produto (visão geral, arquivo)</label>
+          <input type="file" id="s_produto" accept="image/*">
+        </div>
+        <div class="form-actions">
+          <button class="primary" id="cadastrarShopeeBtn">Criar anúncio</button>
+          <a class="ghost" href="https://drive.google.com/drive/folders/1iUnHryjorNYfdIogmbNYOXkNNkL5bk2i" target="_blank" rel="noopener" style="text-decoration:none;display:inline-flex;align-items:center;">🎬 Ver pasta de vídeos</a>
+        </div>
+        <div class="status-line" id="cadastroShopeeStatus"></div>
       </div>
-      <div class="status-line" id="shopeeStatus"></div>
+
+      <div class="info-card">
+        <strong>Otimização</strong>
+        A otimização continua rodando a partir da planilha de Precificação — clique abaixo sempre que quiser otimizar o próximo anúncio pendente. Criação e otimização alimentam a mesma lista de acompanhamento logo abaixo.
+      </div>
+      <div class="card">
+        <div class="form-actions" style="justify-content:flex-start;gap:10px;">
+          <button class="primary" id="runShopeeOtimizarBtn">▶ Otimizar próximo pendente</button>
+        </div>
+        <div class="status-line" id="shopeeStatus"></div>
+      </div>
+    </div>
+
+    <div class="tab-panel" id="panel-shopee-criador-manual">
+      <div class="info-card">
+        <strong>Como funciona</strong>
+        Preenche o formulário e clica em criar. Categoria, título, descrição e atributos são processados igual ao automático; só as fotos são diferentes: quando os 6 prompts ficarem prontos (leva alguns minutos), copia cada um, gera as imagens na ferramenta de IA que preferir e envia os 6 arquivos aqui mesmo.
+      </div>
+      <div class="card">
+        <h2>Novo anúncio (manual)</h2>
+        <div class="grid">
+          <div class="field"><label>SKU</label><input type="text" id="sm_sku" placeholder="SKU-1042"></div>
+          <div class="field span2"><label>Nome do produto</label><input type="text" id="sm_nome" placeholder="Tênis runner pro"></div>
+          <div class="field"><label>Marca</label><input type="text" id="sm_marca" placeholder="Nike"></div>
+          <div class="field"><label>Custo (R$)</label><input type="text" inputmode="decimal" id="sm_custo" placeholder="120,00"></div>
+          <div class="field"><label>Preço de venda (R$)</label><input type="text" inputmode="decimal" id="sm_preco" placeholder="249,90"></div>
+          <div class="field"><label>Estoque (unidades)</label><input type="text" inputmode="numeric" id="sm_estoque" placeholder="10"></div>
+        </div>
+        <hr class="divider">
+        <div class="grid">
+          <div class="field"><label>Peso (kg)</label><input type="text" inputmode="decimal" id="sm_peso" placeholder="0,3"></div>
+          <div class="field"><label>Altura (cm)</label><input type="text" inputmode="decimal" id="sm_altura" placeholder="10"></div>
+          <div class="field"><label>Comprimento (cm)</label><input type="text" inputmode="decimal" id="sm_comprimento" placeholder="15"></div>
+          <div class="field"><label>Largura (cm)</label><input type="text" inputmode="decimal" id="sm_largura" placeholder="10"></div>
+        </div>
+        <hr class="divider">
+        <div class="grid">
+          <div class="field span2">
+            <label>Imagem frente (arquivo)</label>
+            <input type="file" id="sm_frente" accept="image/*">
+          </div>
+          <div class="field span2">
+            <label>Imagem verso (arquivo)</label>
+            <input type="file" id="sm_verso" accept="image/*">
+          </div>
+        </div>
+        <div class="field" style="margin-top:12px;">
+          <label>Foto do produto (visão geral, arquivo)</label>
+          <input type="file" id="sm_produto" accept="image/*">
+        </div>
+        <div class="form-actions">
+          <button class="primary" id="cadastrarShopeeManualBtn">Criar anúncio (manual)</button>
+        </div>
+        <div class="status-line" id="cadastroShopeeManualStatus"></div>
+      </div>
+
+      <div id="shopeeCriadorManualPendingArea"></div>
     </div>
   </div>
 
@@ -591,7 +647,10 @@ const CONFIG = {
   shopee: {
     cadastroTriggerUrl: 'https://n8n.coolify.cadoshop.com.br/webhook/shopee_cadastrar_produto',
     otimizarTriggerUrl: 'https://n8n.coolify.cadoshop.com.br/webhook/shopee_otimizar_anuncio',
-    statusUrl: 'https://n8n.coolify.cadoshop.com.br/webhook/status-shopee'
+    statusUrl: 'https://n8n.coolify.cadoshop.com.br/webhook/status-shopee',
+    criadorManualTriggerUrl: 'https://n8n.coolify.cadoshop.com.br/webhook/shopee_cadastrar_produto_manual',
+    criadorManualStatusUrl: 'https://n8n.coolify.cadoshop.com.br/webhook/status-criador-manual-shopee',
+    criadorManualUploadUrl: 'https://n8n.coolify.cadoshop.com.br/webhook/upload-imagens-shopee'
   },
   pollInterval: 10000
 };
@@ -712,6 +771,9 @@ function fillSettingsForm(){
   $('cfg_shopee_cadastro').value = settings.shopee.cadastroTriggerUrl || '';
   $('cfg_shopee_otimizar').value = settings.shopee.otimizarTriggerUrl || '';
   $('cfg_shopee_status').value = settings.shopee.statusUrl || '';
+  $('cfg_shopee_criador_manual_trigger').value = settings.shopee.criadorManualTriggerUrl || '';
+  $('cfg_shopee_criador_manual_status').value = settings.shopee.criadorManualStatusUrl || '';
+  $('cfg_shopee_criador_manual_upload').value = settings.shopee.criadorManualUploadUrl || '';
 }
 
 $('settingsBtn').addEventListener('click', ()=>{
@@ -740,7 +802,10 @@ $('settingsSaveBtn').addEventListener('click', ()=>{
     shopee: {
       cadastroTriggerUrl: $('cfg_shopee_cadastro').value.trim(),
       otimizarTriggerUrl: $('cfg_shopee_otimizar').value.trim(),
-      statusUrl: $('cfg_shopee_status').value.trim()
+      statusUrl: $('cfg_shopee_status').value.trim(),
+      criadorManualTriggerUrl: $('cfg_shopee_criador_manual_trigger').value.trim(),
+      criadorManualStatusUrl: $('cfg_shopee_criador_manual_status').value.trim(),
+      criadorManualUploadUrl: $('cfg_shopee_criador_manual_upload').value.trim()
     },
     pollInterval: (isNaN(pollSeconds) || pollSeconds <= 0) ? 0 : pollSeconds * 1000
   };
@@ -804,6 +869,19 @@ $('platformBtnCadoshop').addEventListener('click', ()=> switchPlatform('ml', 'ca
 $('platformBtnCadostore').addEventListener('click', ()=> switchPlatform('ml', 'cadostore'));
 $('platformBtnShopee').addEventListener('click', ()=> switchPlatform('shopee'));
 
+function switchShopeeTab(tab){
+  activeShopeeTab = tab;
+  $('tabBtnShopeeCriador').classList.toggle('active', tab === 'criador');
+  $('tabBtnShopeeCriadorManual').classList.toggle('active', tab === 'criadorManual');
+  $('panel-shopee-criador').classList.toggle('active', tab === 'criador');
+  $('panel-shopee-criador-manual').classList.toggle('active', tab === 'criadorManual');
+  busyResumeUrls.clear();
+  busyCancelUids.clear();
+  refreshActiveView();
+}
+$('tabBtnShopeeCriador').addEventListener('click', ()=> switchShopeeTab('criador'));
+$('tabBtnShopeeCriadorManual').addEventListener('click', ()=> switchShopeeTab('criadorManual'));
+
 function updateMlAccountBanner(){
   const banner = $('mlAccountBanner');
   if(!banner) return;
@@ -816,7 +894,10 @@ function updateMlAccountBanner(){
 function refreshActiveView(){
   otimizadorManualFlow.stopPolling();
   criadorManualFlow.stopPolling();
-  $('sharedListWrap').style.display = (activeTab === 'otimizadorManual' || activeTab === 'criadorManual') ? 'none' : '';
+  shopeeCriadorManualFlow.stopPolling();
+
+  const ehShopeeCriadorManual = (activePlatform === 'shopee' && activeShopeeTab === 'criadorManual');
+  $('sharedListWrap').style.display = (activeTab === 'otimizadorManual' || activeTab === 'criadorManual' || ehShopeeCriadorManual) ? 'none' : '';
   updateMlAccountBanner();
 
   if(activeTab === 'otimizadorManual'){
@@ -825,6 +906,10 @@ function refreshActiveView(){
   }
   if(activeTab === 'criadorManual'){
     criadorManualFlow.restartPolling();
+    return;
+  }
+  if(ehShopeeCriadorManual){
+    shopeeCriadorManualFlow.restartPolling();
     return;
   }
   fetchStatus();
@@ -1069,6 +1154,36 @@ wireCreateForm({
     {id: 'largura', label: 'Largura'},
     {id: 'estoque', label: 'Estoque'}
   ]
+});
+
+wireCreateForm({
+  prefix: 'sm',
+  btnId: 'cadastrarShopeeManualBtn',
+  statusId: 'cadastroShopeeManualStatus',
+  getTriggerUrl: () => settings.shopee.criadorManualTriggerUrl,
+  missingTriggerMsg: 'Falta configurar a URL de cadastro/criação (Manual) da Shopee nas Configurações (⚙).',
+  successMsg: 'Anúncio enviado. Quando os prompts das imagens ficarem prontos (leva alguns minutos), eles aparecem aqui embaixo.',
+  onSuccess: null,
+  extraRequiredFields: [
+    {id: 'preco', label: 'Preço de venda'},
+    {id: 'peso', label: 'Peso'},
+    {id: 'altura', label: 'Altura'},
+    {id: 'comprimento', label: 'Comprimento'},
+    {id: 'largura', label: 'Largura'},
+    {id: 'estoque', label: 'Estoque'}
+  ]
+});
+
+const shopeeCriadorManualFlow = createManualImageFlow({
+  areaId: 'shopeeCriadorManualPendingArea',
+  getStatusUrl: () => settings.shopee.criadorManualStatusUrl,
+  getUploadUrl: () => settings.shopee.criadorManualUploadUrl,
+  getCancelUrl: () => '',
+  missingStatusMsg: 'Edita a URL de status do Criador Manual da Shopee nas Configurações (⚙).',
+  missingUploadMsg: 'Falta configurar a URL de upload do Criador Manual da Shopee nas Configurações (⚙).',
+  missingCancelMsg: 'Cancelamento ainda não disponível para o Criador Manual da Shopee.',
+  emptyTitle: 'Nenhuma foto aguardando envio',
+  emptyMsg: 'Assim que um anúncio criado acima chegar na etapa de fotos, os prompts aparecem aqui.'
 });
 
 $('runOtimizadorBtn').addEventListener('click', async ()=>{
