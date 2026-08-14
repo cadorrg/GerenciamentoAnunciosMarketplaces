@@ -484,6 +484,15 @@
         <div class="field span2"><label>Nome do produto</label><input type="text" id="s_nome" placeholder="Tênis runner pro"></div>
         <div class="field"><label>Marca</label><input type="text" id="s_marca" placeholder="Nike"></div>
         <div class="field"><label>Custo (R$)</label><input type="text" inputmode="decimal" id="s_custo" placeholder="120,00"></div>
+        <div class="field"><label>Preço de venda (R$)</label><input type="text" inputmode="decimal" id="s_preco" placeholder="249,90"></div>
+        <div class="field"><label>Estoque (unidades)</label><input type="text" inputmode="numeric" id="s_estoque" placeholder="10"></div>
+      </div>
+      <hr class="divider">
+      <div class="grid">
+        <div class="field"><label>Peso (kg)</label><input type="text" inputmode="decimal" id="s_peso" placeholder="0,3"></div>
+        <div class="field"><label>Altura (cm)</label><input type="text" inputmode="decimal" id="s_altura" placeholder="10"></div>
+        <div class="field"><label>Comprimento (cm)</label><input type="text" inputmode="decimal" id="s_comprimento" placeholder="15"></div>
+        <div class="field"><label>Largura (cm)</label><input type="text" inputmode="decimal" id="s_largura" placeholder="10"></div>
       </div>
       <hr class="divider">
       <div class="grid">
@@ -956,6 +965,17 @@ function wireCreateForm(opts){
       statusEl.className = 'status-line err';
       return;
     }
+    // Campos extras obrigatórios (ex: preço, peso, dimensões, estoque no Shopee)
+    if(opts.extraRequiredFields){
+      for(const f of opts.extraRequiredFields){
+        const el = $(p + '_' + f.id);
+        if(!el || !el.value.trim()){
+          statusEl.textContent = `Preenche o campo "${f.label}" antes de enviar.`;
+          statusEl.className = 'status-line err';
+          return;
+        }
+      }
+    }
 
     const fd = new FormData();
     fd.append('SKU', sku);
@@ -968,6 +988,11 @@ function wireCreateForm(opts){
     fd.append('Custo', parseMoney($(p + '_custo').value) ?? '');
     fd.append('Preço Venda', $(p + '_preco') ? (parseMoney($(p + '_preco').value) ?? '') : '');
     fd.append('Tem Variação?', $(p + '_variacao') ? $(p + '_variacao').value : '');
+    fd.append('Peso', $(p + '_peso') ? (parseMoney($(p + '_peso').value) ?? '') : '');
+    fd.append('Altura', $(p + '_altura') ? (parseMoney($(p + '_altura').value) ?? '') : '');
+    fd.append('Comprimento', $(p + '_comprimento') ? (parseMoney($(p + '_comprimento').value) ?? '') : '');
+    fd.append('Largura', $(p + '_largura') ? (parseMoney($(p + '_largura').value) ?? '') : '');
+    fd.append('Estoque', $(p + '_estoque') ? (parseMoney($(p + '_estoque').value) ?? '') : '');
     fd.append('frente', frenteFile, frenteFile.name);
     fd.append('verso', versoFile, versoFile.name);
     fd.append('produto', produtoFile, produtoFile.name);
@@ -1001,6 +1026,7 @@ function wireCreateForm(opts){
 function clearCreateForm(p){
   [p+'_sku', p+'_nome', p+'_marca'].forEach(id => { if($(id)) $(id).value = ''; });
   [p+'_modelo', p+'_cor', p+'_genero', p+'_ean', p+'_custo', p+'_preco'].forEach(id => { if($(id)) $(id).value = ''; });
+  [p+'_peso', p+'_altura', p+'_comprimento', p+'_largura', p+'_estoque'].forEach(id => { if($(id)) $(id).value = ''; });
   if($(p + '_frente')) $(p + '_frente').value = '';
   if($(p + '_verso')) $(p + '_verso').value = '';
   if($(p + '_produto')) $(p + '_produto').value = '';
@@ -1034,7 +1060,15 @@ wireCreateForm({
   getTriggerUrl: () => settings.shopee.cadastroTriggerUrl,
   missingTriggerMsg: 'Falta configurar a URL de cadastro/criação da Shopee nas Configurações (⚙).',
   successMsg: 'Anúncio enviado. Acompanha o progresso na lista abaixo.',
-  onSuccess: () => setTimeout(fetchStatus, 1200)
+  onSuccess: () => setTimeout(fetchStatus, 1200),
+  extraRequiredFields: [
+    {id: 'preco', label: 'Preço de venda'},
+    {id: 'peso', label: 'Peso'},
+    {id: 'altura', label: 'Altura'},
+    {id: 'comprimento', label: 'Comprimento'},
+    {id: 'largura', label: 'Largura'},
+    {id: 'estoque', label: 'Estoque'}
+  ]
 });
 
 $('runOtimizadorBtn').addEventListener('click', async ()=>{
